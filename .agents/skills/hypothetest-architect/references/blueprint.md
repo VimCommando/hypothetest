@@ -13,7 +13,7 @@ A Hypothetest blueprint is the shareable output of the Architect. It defines the
 ```
 
 - `blueprint.yml`: machine-readable blueprint manifest.
-- `hypothesis.md`: human-authored benchmark hypothesis and description with YAML blocks.
+- `hypothesis.md`: human-authored seven-step hypothesis evaluation with YAML blocks.
 - `hypothetest.yml`: canonical compiled plan.
 - `README.md`: short purpose, prerequisites, expected runtime, and run command.
 
@@ -45,7 +45,7 @@ Use this shape when the benchmark should run independently in another environmen
 - `tracks/`: repo-local Rally tracks, challenges, corpora, operations, parameter sources, and track README files.
 - `templates/`: Elasticsearch component templates, index templates, mappings, settings, ingest pipelines, ILM policies, and repository definitions. Config files should be YAML/YML when authored for Hypothetest; Elasticsearch API payload fixtures may be JSON when the Elasticsearch API requires JSON.
 - `scripts/`: allowlisted user-defined scripts used by benchmark phases.
-  Supported files are scenario-defined and may use Python, Ruby, Bash, Node, Rust, or another language as long as the required runtime is declared and verified before execution.
+  Supported files are hypothesis-defined and may use Python, Ruby, Bash, Node, Rust, or another language as long as the required runtime is declared and verified before execution.
 - `diagnostics/`: esdiag sources files and diagnostic collection plans.
   Supported files: `sources.yml`, `collections.yml`.
 - `generated/`: deterministic Architect output, including compose files, runbook, metrics plan, and generated runner assets.
@@ -141,7 +141,7 @@ Runtime output should not be required to execute the blueprint, but may be inclu
 
 ```text
 runs/
-  <scenario>/
+  <hypothesis-name>/
     <timestamp>/
       manifest.toon
       raw/
@@ -159,6 +159,9 @@ Raw esdiag diagnostics remain zipped esdiag bundles. Hypothetest structured run 
 
 - Prefer relative paths.
 - Do not include secrets, API keys, or environment-specific credentials.
+- Author `hypothesis.md` with the seven-step model: observation, question, hypothesis, variables, experiment design, measurement plan, and interpretation.
+- Include a falsifiable hypothesis, controlled variables, metric sources, a decision rule, and interpretation limits before execution.
+- For inferential comparisons, include null and alternative hypotheses, significance level, confidence level, test direction, statistical assumptions, and practical effect thresholds.
 - Include `checksums.yml` for local datasets, tracks, templates, and scripts when the blueprint is meant to be independently reproducible.
 - Include `blueprint.yml` for every blueprint and validate it against `schemas/blueprint.schema.yaml`.
 - Mark each dataset as `static` or `dynamic`.

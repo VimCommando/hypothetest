@@ -31,7 +31,7 @@ remote:
   workdir: /srv/hypothetest/runs
 ```
 
-The remote SSH username may be declared with `remote.user`. The Coordinator must verify SSH access through the user's `.ssh/config` and permission to run the selected remote compose command before the Operator runs the scenario.
+The remote SSH username may be declared with `remote.user`. The Coordinator must verify SSH access through the user's `.ssh/config` and permission to run the selected remote compose command before the Operator runs the hypothesis.
 
 Default generated files:
 

@@ -44,8 +44,26 @@ spec:
           - _cluster/health
           - _nodes/stats
   comparison:
+    hypothesis:
+      null: string
+      alternative: string
+      tail: one_tailed
     baseline: baseline
     candidates: [candidate]
+    independent: []
+    dependent: []
+    controlled: []
+    dimensions: []
+    statistical_plan:
+      test: bootstrap
+      tail: one_tailed
+      significance_level: 0.05
+      confidence_level: 0.95
+      minimum_effect_size: {}
+      assumptions: []
+      multiple_comparison_correction: false
+    decision_rule: string
   report:
     formats: [markdown, toon, charts]
+    interpretation: string
 ```

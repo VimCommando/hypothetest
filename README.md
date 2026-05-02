@@ -1,10 +1,10 @@
 # Hypothetest Codex Skills
 
-Hypothetest is a declarative workflow for designing, running, and analyzing Elasticsearch benchmark experiments. A user describes a benchmark question, deployment, dataset, variations, phases, metrics, and comparison in Markdown; the skills compile that intent into a canonical plan, execute it, and report the results.
+Hypothetest is a declarative workflow for designing, running, and analyzing Elasticsearch benchmark experiments. A user writes `hypothesis.md` as a seven-step hypothesis evaluation: observation, question, hypothesis, variables, experiment design, measurement plan, and interpretation. The skills compile that intent into a canonical plan, execute it, and report the results.
 
 This repository contains the initial Codex skill set for that workflow:
 
-- **Architect**: turns benchmark intent or `scenario.md` into `hypothetest.yml` plus generated run assets.
+- **Architect**: turns benchmark intent or `hypothesis.md` into `hypothetest.yml` plus generated run assets.
 - **Operator**: runs the canonical plan, starting with local compose deployments using Docker or Podman.
 - **Analyst**: compares run artifacts across variations and emits Markdown, TOON, and chart outputs.
 
@@ -12,7 +12,17 @@ Configurations are YAML/YML files. Hypothetest's own structured run data is stor
 
 Elasticsearch diagnostics are collected through `esdiag`, using YAML-defined API lists for each collection point. `esdiag` keeps raw API outputs in its bundled `.zip` artifact and can also process those diagnostics directly to a results cluster for metric shipping.
 
-The core schema is:
+The hypothesis testing structure is informed by the seven-step model and statistical-risk concepts summarized in [SixSigma.us, "Hypothesis Testing: A Comprehensive Guide with Examples and Applications"](https://www.6sigma.us/six-sigma-in-focus/hypothesis-testing/).
+
+The human-facing process is:
+
+```text
+Observation -> Question -> Hypothesis -> Variables -> Experiment Design -> Measurement Plan -> Interpretation
+```
+
+This keeps first-time authoring simple while still requiring a falsifiable claim, controlled variables, baseline/candidate variations, repeats, isolation, metric sources, a predeclared decision rule, and interpretation limits. More rigorous hypotheses can also declare null and alternative hypotheses, significance level, confidence level, test direction, statistical assumptions, multiple-comparison handling, and practical effect thresholds.
+
+The compiled core schema is:
 
 ```yaml
 deployment
@@ -25,28 +35,28 @@ comparison
 report
 ```
 
-The first execution target is `compose`; `existing` and `elastic-cloud` are planned next targets. Compose scenarios declare `scope: local` or `scope: remote`; remote compose MVP uses SSH certificate auth from the user's `.ssh/config`, may specify `remote.user`, and requires the Coordinator to verify SSH access plus permission to run `docker compose` or `podman compose` on the remote host.
+The first execution target is `compose`; `existing` and `elastic-cloud` are planned next targets. Compose hypotheses declare `scope: local` or `scope: remote`; remote compose MVP uses SSH certificate auth from the user's `.ssh/config`, may specify `remote.user`, and requires the Coordinator to verify SSH access plus permission to run `docker compose` or `podman compose` on the remote host.
 
-## Scenario bundles
+## Blueprints
 
-A portable test is a directory that can be zipped and run elsewhere. The bundle root is the path base for `scenario.md` and `hypothetest.yml`.
+A portable test is a directory that can be zipped and run elsewhere. The blueprint root is the path base for `hypothesis.md` and `hypothetest.yml`.
 
-Minimum bundle:
+Minimum blueprint:
 
 ```text
-<scenario-name>/
-  bundle.yml
-  scenario.md
+<blueprint-name>/
+  blueprint.yml
+  hypothesis.md
   hypothetest.yml
   README.md
 ```
 
-Portable bundle:
+Portable blueprint:
 
 ```text
-<scenario-name>/
-  bundle.yml
-  scenario.md
+<blueprint-name>/
+  blueprint.yml
+  hypothesis.md
   hypothetest.yml
   README.md
   data/
@@ -73,7 +83,7 @@ Datasets are declared as either:
 
 Runtime outputs may include `runs/`, `manifest.toon`, `summary.toon`, `comparison.toon`, and raw esdiag `.zip` bundles.
 
-`bundle.yml` is the machine-readable manifest for the zip contents and validates against `schemas/bundle.schema.yaml`.
+`blueprint.yml` is the machine-readable manifest for the zip contents and validates against `schemas/blueprint.schema.yaml`.
 
 Install as repo-scoped skills by copying `.agents/skills` into the root of your target repository.
 
@@ -83,6 +93,6 @@ cp -R .agents /path/to/repo/
 
 Skills:
 
-- `$hypothetest-architect` — consults on or compiles benchmark scenarios into a canonical plan.
+- `$hypothetest-architect` — consults on or compiles benchmark hypotheses into a canonical plan.
 - `$hypothetest-operator` — implements/runs the plan, initially targeting compose with Docker or Podman.
 - `$hypothetest-analyst` — interprets run artifacts and writes comparison reports.

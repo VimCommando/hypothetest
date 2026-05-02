@@ -353,6 +353,26 @@ $defs:
       - baseline
       - candidates
     properties:
+      hypothesis:
+        oneOf:
+          - type: string
+            minLength: 1
+          - type: object
+            additionalProperties: false
+            required:
+              - null
+              - alternative
+            properties:
+              "null":
+                type: string
+                minLength: 1
+              alternative:
+                type: string
+                minLength: 1
+              tail:
+                enum:
+                  - one_tailed
+                  - two_tailed
       baseline:
         type: string
         minLength: 1
@@ -362,6 +382,94 @@ $defs:
         items:
           type: string
           minLength: 1
+      independent:
+        type: array
+        default: []
+        items:
+          type: string
+          minLength: 1
+      dependent:
+        type: array
+        default: []
+        items:
+          type: string
+          minLength: 1
+      controlled:
+        type: array
+        default: []
+        items:
+          type: string
+          minLength: 1
+      dimensions:
+        type: array
+        default: []
+        items:
+          type: string
+          minLength: 1
+      decision_rule:
+        type: string
+        minLength: 1
+      statistical_plan:
+        type: object
+        additionalProperties: false
+        properties:
+          test:
+            enum:
+              - z_test
+              - t_test
+              - mann_whitney_u
+              - wilcoxon
+              - anova
+              - bootstrap
+              - permutation
+              - descriptive
+              - exploratory
+          tail:
+            enum:
+              - one_tailed
+              - two_tailed
+          significance_level:
+            type: number
+            exclusiveMinimum: 0
+            exclusiveMaximum: 1
+          confidence_level:
+            type: number
+            exclusiveMinimum: 0
+            exclusiveMaximum: 1
+          minimum_effect_size:
+            oneOf:
+              - type: string
+                minLength: 1
+              - type: object
+                additionalProperties:
+                  oneOf:
+                    - type: string
+                      minLength: 1
+                    - type: number
+          assumptions:
+            type: array
+            default: []
+            items:
+              type: string
+              minLength: 1
+          power:
+            type: object
+            additionalProperties: true
+            properties:
+              target:
+                type: number
+                exclusiveMinimum: 0
+                exclusiveMaximum: 1
+              minimum_repeats:
+                type: integer
+                minimum: 1
+          multiple_comparison_correction:
+            oneOf:
+              - type: boolean
+              - enum:
+                  - bonferroni
+                  - false_discovery_rate
+                  - none
 
   report:
     type: object
@@ -378,3 +486,6 @@ $defs:
             - markdown
             - toon
             - charts
+      interpretation:
+        type: string
+        minLength: 1
