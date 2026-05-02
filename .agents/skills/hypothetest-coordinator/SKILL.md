@@ -90,7 +90,10 @@ If the user does not know, default to `compose`, unknown dataset loader, and esd
 For `compose`:
 
 - Verify at least one compose engine path exists: `docker compose`, `podman compose`, or `podman-compose`.
-- Confirm the scenario's memory and disk expectations are realistic for local execution.
+- If `deployment.scope` is `remote`, validate SSH access to `deployment.remote.auth.ssh_config_host` using the user's `.ssh/config`, optional `deployment.remote.user`, and certificate-based auth.
+- If `deployment.scope` is `remote`, validate the remote user can run the selected compose command: `docker compose version`, `podman compose version`, or `podman-compose --version`.
+- If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
+- Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host.
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
 - Confirm generated volume and repository paths are repo-local or clearly declared.
 
@@ -174,6 +177,15 @@ credential_requirements[1]{name,status,required_for}:
 operator_handoff:
   scenario: hypothetest.yml
   readiness: generated/readiness.md
+```
+
+For remote compose, include SSH and compose checks in `verified`:
+
+```toon
+verified[3]:
+  ssh access via ~/.ssh/config host bench-host
+  remote docker compose version
+  remote workdir writable
 ```
 
 ## Boundary rules

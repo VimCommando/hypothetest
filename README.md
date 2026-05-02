@@ -25,7 +25,7 @@ comparison
 report
 ```
 
-The first execution target is `compose`; `existing` and `elastic-cloud` are planned next targets.
+The first execution target is `compose`; `existing` and `elastic-cloud` are planned next targets. Compose scenarios declare `scope: local` or `scope: remote`; remote compose MVP uses SSH certificate auth from the user's `.ssh/config`, may specify `remote.user`, and requires the Coordinator to verify SSH access plus permission to run `docker compose` or `podman compose` on the remote host.
 
 ## Scenario bundles
 

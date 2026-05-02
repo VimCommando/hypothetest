@@ -12,8 +12,26 @@ Goals:
 Engine values:
 
 ```yaml
+scope: local | remote
 engine: auto | docker | podman
 ```
+
+Remote compose MVP uses SSH certificate-based auth:
+
+```yaml
+target: compose
+scope: remote
+engine: docker
+remote:
+  host: bench-host
+  user: benchmark
+  auth:
+    method: ssh_certificate
+    ssh_config_host: bench-host
+  workdir: /srv/hypothetest/runs
+```
+
+The remote SSH username may be declared with `remote.user`. The Coordinator must verify SSH access through the user's `.ssh/config` and permission to run the selected remote compose command before the Operator runs the scenario.
 
 Default generated files:
 

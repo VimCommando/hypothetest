@@ -70,6 +70,7 @@ Accept:
 ```yaml
 deployment:
   target: compose
+  scope: local | remote
   engine: auto | docker | podman
 ```
 
@@ -81,6 +82,13 @@ Resolution order when `engine: auto`:
 4. Else fail with installation instructions.
 
 Do not assume Docker is present.
+
+For `scope: remote`, require Coordinator readiness evidence before execution. The remote host must be reachable through the user's `.ssh/config` using SSH certificate auth, and the remote user must be able to run the resolved compose command:
+
+- `docker compose version` for Docker.
+- `podman compose version` or `podman-compose --version` for Podman.
+
+Run compose operations on the remote host in the declared `deployment.remote.workdir`. Do not attempt remote execution when SSH access or compose permissions are unverified.
 
 ## Compose generated assets
 

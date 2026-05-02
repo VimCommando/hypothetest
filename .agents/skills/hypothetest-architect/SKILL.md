@@ -64,6 +64,7 @@ When target is `compose`, use these defaults unless overridden:
 ```yaml
 deployment:
   target: compose
+  scope: local
   engine: auto
   elasticsearch:
     version: 8.18.0
@@ -81,6 +82,24 @@ deployment:
 For local compose snapshot, searchable snapshot, frozen-like, or repository behavior, use Elasticsearch filesystem (`fs`) repositories mounted into the Elasticsearch container. MinIO and S3-compatible services are out of scope for local compose.
 
 Compose output should be marked development-grade in generated report guidance and runbooks.
+
+Compose can run locally or on a remote host:
+
+```yaml
+deployment:
+  target: compose
+  scope: remote
+  engine: docker
+  remote:
+    host: bench-host
+    user: benchmark
+    auth:
+      method: ssh_certificate
+      ssh_config_host: bench-host
+    workdir: /srv/hypothetest/runs
+```
+
+For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to run the selected compose engine before Operator execution.
 
 ## Dataset loaders
 
@@ -251,6 +270,8 @@ Before finalizing a plan:
 - Metric sources are plausible.
 - Elasticsearch diagnostic metric sources use `esdiag` collections with explicit API lists.
 - Compose scenarios include engine handling: `auto`, `docker`, or `podman`.
+- Compose scenarios declare `scope: local` or `scope: remote`.
+- Remote compose scenarios declare SSH certificate auth and require Coordinator readiness validation.
 - Snapshot/searchable snapshot scenarios include filesystem repository configuration for local compose.
 - Reports include Markdown and TOON unless the user says otherwise.
 - Baseline and candidate names match variation keys exactly.
