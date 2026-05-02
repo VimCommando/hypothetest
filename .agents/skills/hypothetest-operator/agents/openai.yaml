@@ -1,0 +1,4 @@
+interface:
+  brand_color: "#00BFB3"
+policy:
+  allow_implicit_invocation: true

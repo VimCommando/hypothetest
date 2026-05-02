@@ -1,0 +1,345 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://hypothetest.elastic/schemas/hypothetest.schema.yaml
+title: Hypothetest BenchmarkScenario
+type: object
+additionalProperties: false
+required:
+  - apiVersion
+  - kind
+  - metadata
+  - spec
+properties:
+  apiVersion:
+    const: hypothetest.elastic/v1
+  kind:
+    const: BenchmarkScenario
+  metadata:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        pattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
+      owner:
+        type: string
+        minLength: 1
+      description:
+        type: string
+  spec:
+    type: object
+    additionalProperties: false
+    required:
+      - question
+      - deployment
+      - dataset
+      - variations
+      - benchmark
+      - metrics
+      - comparison
+      - report
+    properties:
+      question:
+        type: string
+        minLength: 1
+      deployment:
+        $ref: "#/$defs/deployment"
+      dataset:
+        $ref: "#/$defs/dataset"
+      setup:
+        type: array
+        default: []
+        items:
+          $ref: "#/$defs/action"
+      variations:
+        type: object
+        minProperties: 2
+        additionalProperties:
+          $ref: "#/$defs/variation"
+      benchmark:
+        $ref: "#/$defs/benchmark"
+      isolation:
+        $ref: "#/$defs/isolation"
+      runners:
+        type: object
+        additionalProperties:
+          $ref: "#/$defs/runner"
+      metrics:
+        $ref: "#/$defs/metrics"
+      diagnostics:
+        $ref: "#/$defs/diagnostics"
+      comparison:
+        $ref: "#/$defs/comparison"
+      report:
+        $ref: "#/$defs/report"
+
+$defs:
+  deployment:
+    type: object
+    additionalProperties: true
+    required:
+      - target
+    properties:
+      target:
+        enum:
+          - compose
+          - existing
+          - elastic-cloud
+      engine:
+        enum:
+          - auto
+          - docker
+          - podman
+      elasticsearch:
+        type: object
+        additionalProperties: true
+        properties:
+          version:
+            type: string
+          heap:
+            type: string
+          memory:
+            type: string
+          security:
+            type: boolean
+      services:
+        type: object
+        additionalProperties: false
+        properties:
+          kibana:
+            type: boolean
+      repositories:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties: true
+          required:
+            - type
+            - location
+          properties:
+            type:
+              const: fs
+            location:
+              type: string
+              minLength: 1
+
+  dataset:
+    type: object
+    additionalProperties: true
+    required:
+      - loader
+    properties:
+      loader:
+        enum:
+          - rally
+          - espipe
+      track:
+        type: string
+      challenge:
+        type: string
+      input:
+        type: string
+      target:
+        type: string
+      default_settings:
+        type: object
+        additionalProperties: true
+      params:
+        type: object
+        additionalProperties: true
+      options:
+        type: object
+        additionalProperties: true
+
+  variation:
+    type: object
+    additionalProperties: true
+    properties:
+      description:
+        type: string
+      settings:
+        type: object
+        additionalProperties: true
+      setup:
+        type: array
+        items:
+          $ref: "#/$defs/action"
+
+  action:
+    type: object
+    additionalProperties: true
+    minProperties: 1
+
+  benchmark:
+    type: object
+    additionalProperties: false
+    required:
+      - phases
+    properties:
+      repeats:
+        type: integer
+        minimum: 1
+        default: 3
+      randomize_variation_order:
+        type: boolean
+        default: true
+      continue_on_error:
+        type: boolean
+        default: false
+      phases:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/phase"
+
+  phase:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - runner
+      - config
+    properties:
+      name:
+        type: string
+        minLength: 1
+      runner:
+        enum:
+          - rally
+          - espipe
+          - elasticsearch_api
+          - shell
+          - python
+      config:
+        type: object
+        additionalProperties: true
+
+  isolation:
+    type: object
+    additionalProperties: false
+    properties:
+      mode:
+        enum:
+          - reset_between_variations
+          - shared_deployment
+          - custom
+      reset:
+        type: array
+        items:
+          enum:
+            - delete_indices
+            - clear_caches
+            - reload_dataset
+            - delete_volumes
+            - restore_snapshot
+            - verify_cluster_green
+
+  runner:
+    type: object
+    additionalProperties: true
+    required:
+      - type
+    properties:
+      type:
+        enum:
+          - rally
+          - espipe
+          - http
+          - shell
+          - python
+      command:
+        type: string
+      base_url:
+        type: string
+      allowlist:
+        type: array
+        items:
+          type: string
+
+  metrics:
+    type: object
+    additionalProperties: false
+    required:
+      - primary
+    properties:
+      primary:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      secondary:
+        type: array
+        default: []
+        items:
+          type: string
+          minLength: 1
+
+  diagnostics:
+    type: object
+    additionalProperties: false
+    required:
+      - collector
+    properties:
+      collector:
+        const: esdiag
+      sources:
+        type: string
+      results:
+        type: object
+        additionalProperties: false
+        properties:
+          target:
+            type: string
+          process:
+            type: boolean
+            default: true
+      collections:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties: false
+          required:
+            - apis
+          properties:
+            apis:
+              type: array
+              minItems: 1
+              items:
+                type: string
+                minLength: 1
+
+  comparison:
+    type: object
+    additionalProperties: false
+    required:
+      - baseline
+      - candidates
+    properties:
+      baseline:
+        type: string
+        minLength: 1
+      candidates:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+
+  report:
+    type: object
+    additionalProperties: false
+    required:
+      - formats
+    properties:
+      formats:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          enum:
+            - markdown
+            - toon
+            - charts
