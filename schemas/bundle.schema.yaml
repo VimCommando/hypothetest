@@ -79,6 +79,13 @@ properties:
         default: []
         items:
           $ref: "#/$defs/fixture"
+      datasets:
+        type: array
+        default: []
+        items:
+          oneOf:
+            - $ref: "#/$defs/static_dataset"
+            - $ref: "#/$defs/dynamic_dataset"
       checksums:
         type: string
         default: checksums.yml
@@ -145,5 +152,102 @@ $defs:
         default: true
       checksum:
         type: string
+      description:
+        type: string
+
+  static_dataset:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - mode
+      - path
+      - format
+    properties:
+      name:
+        type: string
+        minLength: 1
+      mode:
+        const: static
+      path:
+        type: string
+        minLength: 1
+      format:
+        enum:
+          - ndjson
+          - jsonl
+          - csv
+          - tsv
+          - ndjson.gz
+          - jsonl.gz
+          - csv.gz
+          - tsv.gz
+      target:
+        type: string
+      size:
+        type: string
+      documents:
+        type: integer
+        minimum: 0
+      checksum:
+        type: string
+      generated_by:
+        type: string
+      description:
+        type: string
+
+  dynamic_dataset:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - mode
+      - generator
+    properties:
+      name:
+        type: string
+        minLength: 1
+      mode:
+        const: dynamic
+      generator:
+        type: object
+        additionalProperties: true
+        required:
+          - tool
+        properties:
+          tool:
+            enum:
+              - rally
+              - espipe
+              - shell
+              - python
+          track:
+            type: string
+          challenge:
+            type: string
+          params:
+            type: object
+            additionalProperties: true
+          command:
+            type: string
+          script:
+            type: string
+      output:
+        type: object
+        additionalProperties: false
+        properties:
+          target:
+            type: string
+          expected_size:
+            type: string
+          expected_documents:
+            type: integer
+            minimum: 0
+      schema:
+        type: string
+      seed:
+        type:
+          - integer
+          - string
       description:
         type: string

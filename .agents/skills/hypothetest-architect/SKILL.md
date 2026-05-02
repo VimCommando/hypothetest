@@ -106,6 +106,11 @@ dataset:
 
 Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
 
+Dataset fixtures in portable bundles are either `static` or `dynamic`:
+
+- `static`: Architect generates or accepts a persisted fixture file under `data/` and records checksum metadata in `bundle.yml`.
+- `dynamic`: Architect defines the generation tool, schema, seed, and expected size in `bundle.yml`; Operator generates or loads it during execution.
+
 ## Benchmark phases
 
 Represent benchmarks as user-defined phases, not as a fixed enum of operations.

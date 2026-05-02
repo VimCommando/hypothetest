@@ -135,6 +135,11 @@ For force-merge, snapshot, restore, searchable snapshot, and frozen-like workflo
 
 Support initial loaders:
 
+Dataset bundle modes:
+
+- `static`: load the bundle-local dataset file and verify its checksum when provided.
+- `dynamic`: execute the declared generator during the run, such as Rally producing a large nginx log corpus. Record generator command, parameters, seed, output target, and observed size/document count in the run manifest.
+
 ### Rally
 
 Use Rally for track/challenge-based data or workloads.
