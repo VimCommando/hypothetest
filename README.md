@@ -35,6 +35,7 @@ Minimum bundle:
 
 ```text
 <scenario-name>/
+  bundle.yml
   scenario.md
   hypothetest.yml
   README.md
@@ -44,6 +45,7 @@ Portable bundle:
 
 ```text
 <scenario-name>/
+  bundle.yml
   scenario.md
   hypothetest.yml
   README.md
@@ -65,6 +67,8 @@ Supported fixtures:
 - `diagnostics/`: esdiag `sources.yml` and collection plans.
 
 Runtime outputs may include `runs/`, `manifest.toon`, `summary.toon`, `comparison.toon`, and raw esdiag `.zip` bundles.
+
+`bundle.yml` is the machine-readable manifest for the zip contents and validates against `schemas/bundle.schema.yaml`.
 
 Install as repo-scoped skills by copying `.agents/skills` into the root of your target repository.
 
