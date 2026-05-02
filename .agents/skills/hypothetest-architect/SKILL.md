@@ -172,6 +172,8 @@ generated/
 
 If creating Codex-ready repository content, use repo-scoped skills under `.agents/skills`.
 
+When asked to define, package, or review a portable test scenario, use the scenario bundle layout in `references/scenario-bundle.md`. All relative paths in `scenario.md` and `hypothetest.yml` should resolve from the bundle root.
+
 `hypothetest.yml` must use this canonical top-level shape:
 
 ```yaml
@@ -256,5 +258,6 @@ Return concrete files or patches when possible. Avoid abstract brainstorming onc
 ## References
 
 - `references/scenario-format.md`
+- `references/scenario-bundle.md`
 - `references/compose-target.md`
 - `references/canonical-schema.md`

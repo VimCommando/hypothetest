@@ -27,6 +27,45 @@ report
 
 The first execution target is `compose`; `existing` and `elastic-cloud` are planned next targets.
 
+## Scenario bundles
+
+A portable test is a directory that can be zipped and run elsewhere. The bundle root is the path base for `scenario.md` and `hypothetest.yml`.
+
+Minimum bundle:
+
+```text
+<scenario-name>/
+  scenario.md
+  hypothetest.yml
+  README.md
+```
+
+Portable bundle:
+
+```text
+<scenario-name>/
+  scenario.md
+  hypothetest.yml
+  README.md
+  data/
+  tracks/
+  templates/
+  scripts/
+  diagnostics/
+  generated/
+  checksums.yml
+```
+
+Supported fixtures:
+
+- `data/`: `.ndjson`, `.jsonl`, `.csv`, `.tsv`, and gzip variants.
+- `tracks/`: local Rally tracks and corpora.
+- `templates/`: Elasticsearch templates, mappings, settings, pipelines, policies, and repository definitions.
+- `scripts/`: allowlisted `.sh` and `.py` phase runners.
+- `diagnostics/`: esdiag `sources.yml` and collection plans.
+
+Runtime outputs may include `runs/`, `manifest.toon`, `summary.toon`, `comparison.toon`, and raw esdiag `.zip` bundles.
+
 Install as repo-scoped skills by copying `.agents/skills` into the root of your target repository.
 
 ```bash
