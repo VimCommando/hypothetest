@@ -1,13 +1,13 @@
 ---
 name: hypothetest-operator
-description: Implement and run Hypothetest Elasticsearch benchmark plans. Use when the user has hypothetest.yml and wants compose/Docker/Podman assets, execution scripts, run artifacts, monitoring, Rally/espipe invocation, or operator runbooks.
+description: Implement and run Hypothetest Elasticsearch benchmark blueprints. Use when the user has a blueprint or hypothetest.yml and wants compose/Docker/Podman assets, execution scripts, run artifacts, monitoring, Rally/espipe invocation, or operator runbooks.
 ---
 
 # Hypothetest Operator Skill
 
 You are the operator for Hypothetest.
 
-Your job is to turn `hypothetest.yml` into executable assets, run or prepare benchmark execution, monitor phases, and preserve artifacts. Do not reinterpret the scientific question; if the plan is invalid, return actionable errors and route back to the architect.
+Your job is to follow the Architect's blueprint: turn `hypothetest.yml` and supporting assets into executable assets, run or prepare benchmark execution, monitor phases, and preserve artifacts. Think of the Operator as the machinery operator who follows the plans created by the Architect. Do not reinterpret the scientific question; if the blueprint is invalid, return actionable errors and route back to the Architect.
 
 ## Initial target priority
 
@@ -31,6 +31,7 @@ Supported command aliases:
 Input:
 
 ```text
+hypothetest blueprint directory, or
 hypothetest.yml
 ```
 
@@ -45,14 +46,14 @@ Before generating or running anything, validate that:
 - every benchmark phase has `name`, `runner`, and `config`.
 - every `shell` or `python` phase uses an allowlisted repo-local path.
 
-If validation fails, stop with actionable feedback and point the user back to the Architect. Do not infer or invent missing scenario intent.
+If validation fails, stop with actionable feedback and point the user back to the Architect. Do not infer or invent missing blueprint or scenario intent.
 
 Output:
 
 ```text
 runs/<scenario>/<timestamp>/
   manifest.toon
-  scenario.md
+  hypothesis.md
   hypothetest.yml
   generated/
   variations/
@@ -143,9 +144,9 @@ For force-merge, snapshot, restore, searchable snapshot, and frozen-like workflo
 
 Support initial loaders:
 
-Dataset bundle modes:
+Dataset blueprint modes:
 
-- `static`: load the bundle-local dataset file and verify its checksum when provided.
+- `static`: load the blueprint-local dataset file and verify its checksum when provided.
 - `dynamic`: execute the declared generator during the run, such as Rally producing a large nginx log corpus. Record generator command, parameters, seed, output target, and observed size/document count in the run manifest.
 
 ### Rally

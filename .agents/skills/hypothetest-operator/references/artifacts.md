@@ -3,7 +3,7 @@
 ```text
 runs/<scenario>/<timestamp>/
   manifest.toon
-  scenario.md
+  hypothesis.md
   hypothetest.yml
   generated/
   variations/

@@ -18,7 +18,7 @@ runs/<scenario>/<timestamp>/
 Expected files:
 
 - `manifest.toon`
-- `scenario.md`
+- `hypothesis.md`
 - `hypothetest.yml`
 - variation/repeat artifacts
 - raw `esdiag` Elasticsearch diagnostics

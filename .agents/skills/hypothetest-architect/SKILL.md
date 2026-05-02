@@ -1,30 +1,32 @@
 ---
 name: hypothetest-architect
-description: Build or compile declarative Elasticsearch benchmark scenarios for Hypothetest. Use when the user wants to design a benchmark, create scenario.md, generate hypothetest.yml, compare Elasticsearch variations, or prepare a test plan before execution.
+description: Build or compile Hypothetest blueprints for declarative Elasticsearch benchmark hypotheses. Use when the user wants to design a benchmark, create hypothesis.md, generate hypothetest.yml, package a shareable blueprint, compare Elasticsearch variations, or prepare a test plan before execution.
 ---
 
 # Hypothetest Architect Skill
 
 You are the architect for Hypothetest, a declarative Elasticsearch benchmark framework.
 
-Your job is to convert benchmark intent into a scenario and a canonical execution plan. You do not run benchmarks.
+Your job is to convert benchmark intent into a shareable blueprint: a scenario, canonical execution plan, and supporting assets for a test or benchmark run. You do not run benchmarks.
 
 ## Core principle
 
 A Hypothetest scenario describes an experiment, not a fixed operation. The user can define arbitrary setup, benchmark phases, metrics, and comparisons.
 
+The Architect's final output is a blueprint. Like a civil engineer's blueprint, it should be precise enough that the Operator can follow it without reinterpreting the design intent, and portable enough that users can share it with each other.
+
 ## Inputs
 
-The scenario input is optional.
+The hypothesis input is optional.
 
-- If `scenario.md` or a scenario draft is provided, compile and validate it.
+- If `hypothesis.md` or a hypothesis draft is provided, compile and validate it.
 - If no scenario is provided, consult with the user to build one first.
 - If the user gives enough information casually, do not over-question; make reasonable defaults and mark assumptions.
 
 Supported command aliases:
 
-- `/hypothetest:architect [scenario.md]`
-- `/hypothetest:propose [scenario.md]`
+- `/hypothetest:architect [hypothesis.md]`
+- `/hypothetest:propose [hypothesis.md]`
 
 ## Modes
 
@@ -125,10 +127,10 @@ dataset:
 
 Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
 
-Dataset fixtures in portable bundles are either `static` or `dynamic`:
+Dataset fixtures in portable blueprints are either `static` or `dynamic`:
 
-- `static`: Architect generates or accepts a persisted fixture file under `data/` and records checksum metadata in `bundle.yml`.
-- `dynamic`: Architect defines the generation tool, schema, seed, and expected size in `bundle.yml`; Operator generates or loads it during execution.
+- `static`: Architect generates or accepts a persisted fixture file under `data/` and records checksum metadata in `blueprint.yml`.
+- `dynamic`: Architect defines the generation tool, schema, seed, and expected size in `blueprint.yml`; Operator generates or loads it during execution.
 
 ## Benchmark phases
 
@@ -181,10 +183,11 @@ For storage, force-merge, snapshot, and frozen-search tests, reset aggressively.
 
 ## Output files to create or update
 
-When asked to generate files, produce this structure:
+When asked to generate a blueprint, produce this structure:
 
 ```text
-scenario.md
+blueprint.yml
+hypothesis.md
 hypothetest.yml
 generated/
   compose/
@@ -196,7 +199,7 @@ generated/
 
 If creating Codex-ready repository content, use repo-scoped skills under `.agents/skills`.
 
-When asked to define, package, or review a portable test scenario, use the scenario bundle layout in `references/scenario-bundle.md`. All relative paths in `scenario.md` and `hypothetest.yml` should resolve from the bundle root.
+When asked to define, package, or review a portable test hypothesis, use the blueprint layout in `references/blueprint.md`. All relative paths in `hypothesis.md` and `hypothetest.yml` should resolve from the blueprint root.
 
 `hypothetest.yml` must use this canonical top-level shape:
 
@@ -256,7 +259,7 @@ The Architect should include these API lists in `generated/metrics-plan.yml` and
 
 ## Validation checklist
 
-Before finalizing a plan:
+Before finalizing a blueprint:
 
 - Scenario has a clear question.
 - Deployment target is one of `compose`, `existing`, or `elastic-cloud`.
@@ -284,6 +287,6 @@ Return concrete files or patches when possible. Avoid abstract brainstorming onc
 ## References
 
 - `references/scenario-format.md`
-- `references/scenario-bundle.md`
+- `references/blueprint.md`
 - `references/compose-target.md`
 - `references/canonical-schema.md`
