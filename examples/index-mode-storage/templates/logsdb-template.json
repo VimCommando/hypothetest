@@ -1,0 +1,47 @@
+{
+  "index_patterns": [
+    "yelp-reviews-logsdb"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.mode": "logsdb",
+      "default_pipeline": "yelp-reviews-date-to-timestamp"
+    },
+    "mappings": {
+      "dynamic": false,
+      "properties": {
+        "review_id": {
+          "type": "keyword"
+        },
+        "user_id": {
+          "type": "keyword"
+        },
+        "business_id": {
+          "type": "keyword"
+        },
+        "stars": {
+          "type": "float"
+        },
+        "useful": {
+          "type": "integer"
+        },
+        "funny": {
+          "type": "integer"
+        },
+        "cool": {
+          "type": "integer"
+        },
+        "text": {
+          "type": "text"
+        },
+        "@timestamp": {
+          "type": "date",
+          "format": "yyyy-MM-dd HH:mm:ss"
+        }
+      }
+    }
+  }
+}

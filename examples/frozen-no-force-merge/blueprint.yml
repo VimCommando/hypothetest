@@ -1,0 +1,33 @@
+apiVersion: hypothetest.elastic/v1
+kind: Blueprint
+metadata:
+  name: frozen-no-force-merge-search-cost
+  owner: search-storage
+  description: Compare frozen searchable snapshot search cost with and without force merge.
+spec:
+  hypothesis: hypothesis.md
+  plan: hypothetest.yml
+  readme: README.md
+  portability:
+    self_contained: false
+    expected_runtime: 45m
+    prerequisites:
+      - docker or podman
+      - esrally
+      - espipe
+      - esdiag
+  directories:
+    data: data/
+    tracks: tracks/
+    templates: templates/
+    generated: generated/
+  datasets:
+    - name: http-logs
+      mode: static
+      path: data/http_logs.ndjson
+      format: ndjson
+      target: logs-benchmark-default
+      description: HTTP log documents used for frozen searchable snapshot search benchmarks.
+  archive:
+    format: zip
+    include_runs: false

@@ -1,0 +1,46 @@
+{
+  "index_patterns": [
+    "yelp-reviews-standard-best-compression"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.codec": "best_compression"
+    },
+    "mappings": {
+      "dynamic": false,
+      "properties": {
+        "review_id": {
+          "type": "keyword"
+        },
+        "user_id": {
+          "type": "keyword"
+        },
+        "business_id": {
+          "type": "keyword"
+        },
+        "stars": {
+          "type": "float"
+        },
+        "useful": {
+          "type": "integer"
+        },
+        "funny": {
+          "type": "integer"
+        },
+        "cool": {
+          "type": "integer"
+        },
+        "text": {
+          "type": "text"
+        },
+        "date": {
+          "type": "date",
+          "format": "yyyy-MM-dd HH:mm:ss"
+        }
+      }
+    }
+  }
+}

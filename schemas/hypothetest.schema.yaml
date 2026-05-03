@@ -303,14 +303,45 @@ $defs:
         type: array
         minItems: 1
         items:
-          type: string
-          minLength: 1
+          $ref: "#/$defs/metric"
       secondary:
         type: array
         default: []
         items:
-          type: string
-          minLength: 1
+          $ref: "#/$defs/metric"
+
+  metric:
+    oneOf:
+      - type: string
+        minLength: 1
+      - type: object
+        additionalProperties: true
+        required:
+          - name
+          - source
+        properties:
+          name:
+            type: string
+            minLength: 1
+          unit:
+            type: string
+          source:
+            enum:
+              - rally
+              - espipe
+              - elasticsearch_api
+              - esdiag
+              - phase_artifact
+              - shell
+              - python
+          api:
+            type: string
+          field:
+            type: string
+          phase:
+            type: string
+          artifact:
+            type: string
 
   diagnostics:
     type: object
@@ -470,6 +501,8 @@ $defs:
                   - bonferroni
                   - false_discovery_rate
                   - none
+          multiple_comparison_note:
+            type: string
 
   report:
     type: object

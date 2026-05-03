@@ -1,0 +1,32 @@
+status: ready_with_warnings
+checked: 2026-05-02
+deployment_target: compose/remote/podman
+dataset_loader: espipe
+diagnostics: esdiag
+
+blockers[0]:
+
+warnings[1]:
+  espipe output format unconfirmed — indexing_throughput_docs_per_sec may require manual parsing
+
+verified[10]:
+  podman-compose 1.5.0 on ironhide.local — present and functional
+  ssh access via ~/.ssh/config host ironhide.local — ok, certificate auth
+  remote user reno uid=1000 wheel group
+  remote podman 5.8.2 — present and functional
+  dataset local at datasets/yelp/yelp_academic_dataset_review.json — espipe streams to http://ironhide.local:9200, no transfer required
+  remote workdir /tmp/hypothetest/runs — writable, created successfully
+  remote disk space 1.1 TB free on /var — sufficient
+  local esdiag 0.15.0-SNAPSHOT — present
+  local curl 8.7.1 — present
+  local jq 1.7.1 — present
+  espipe 0.3.0 at /Users/reno/.cargo/bin/espipe — --template/--pipeline flags confirmed
+
+required_before_operator[1]:
+  confirm espipe invocations use /Users/reno/.cargo/bin/espipe (0.3.0)
+
+operator_handoff:
+  blueprint: blueprints/index-mode-storage/blueprint.yml
+  scenario: blueprints/index-mode-storage/hypothetest.yml
+  runbook: blueprints/index-mode-storage/generated/runbook.md
+  readiness: blueprints/index-mode-storage/generated/readiness.md

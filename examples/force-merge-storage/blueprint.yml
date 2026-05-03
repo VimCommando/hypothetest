@@ -1,0 +1,30 @@
+apiVersion: hypothetest.elastic/v1
+kind: Blueprint
+metadata:
+  name: force-merge-storage-comparison
+  owner: storage
+  description: Compare force-merge behavior across compose storage modes.
+spec:
+  hypothesis: hypothesis.md
+  plan: hypothetest.yml
+  readme: README.md
+  portability:
+    self_contained: false
+    expected_runtime: 30m
+    prerequisites:
+      - docker or podman
+      - espipe
+      - esdiag
+  directories:
+    data: data/
+    generated: generated/
+  datasets:
+    - name: logs
+      mode: static
+      path: data/logs.ndjson
+      format: ndjson
+      target: logs-benchmark-default
+      description: Log documents used for the force-merge storage comparison.
+  archive:
+    format: zip
+    include_runs: false

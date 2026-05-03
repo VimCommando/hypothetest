@@ -1,0 +1,40 @@
+# logsdb index template overlay — extends the base template for the logsdb
+# variation. Adds @timestamp (required by logsdb mode) and sets the default
+# ingest pipeline that renames date → @timestamp.
+#
+# Apply with:
+#   PUT /_index_template/yelp-reviews-logsdb
+# (after yelp-reviews-base is applied; higher priority wins)
+
+name: yelp-reviews-logsdb
+index_patterns:
+  - yelp-reviews-logsdb
+priority: 200
+template:
+  settings:
+    number_of_shards: 1
+    number_of_replicas: 0
+    index.mode: logsdb
+    default_pipeline: yelp-reviews-date-to-timestamp
+  mappings:
+    dynamic: false
+    properties:
+      review_id:
+        type: keyword
+      user_id:
+        type: keyword
+      business_id:
+        type: keyword
+      stars:
+        type: float
+      useful:
+        type: integer
+      funny:
+        type: integer
+      cool:
+        type: integer
+      text:
+        type: text
+      "@timestamp":
+        type: date
+        format: "yyyy-MM-dd HH:mm:ss"

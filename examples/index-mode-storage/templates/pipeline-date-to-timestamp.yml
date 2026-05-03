@@ -1,0 +1,12 @@
+# Ingest pipeline — renames the `date` field to `@timestamp`.
+# Required for the logsdb variation, which mandates an @timestamp field.
+#
+# Apply with:
+#   PUT /_ingest/pipeline/yelp-reviews-date-to-timestamp
+
+name: yelp-reviews-date-to-timestamp
+description: "Renames the Yelp review `date` field to `@timestamp` for logsdb compatibility."
+processors:
+  - rename:
+      field: date
+      target_field: "@timestamp"
