@@ -5,7 +5,7 @@ owner: storage
 
 # 1. Observation
 
-Force merge is storage intensive, and local compose runs can use either Docker named volumes or bind mounts. The selected storage mode may change merge duration, disk write behavior, and resulting segment/store metrics.
+Force merge is storage intensive, and local compose evaluations can use either Docker named volumes or bind mounts. The selected storage mode may change merge duration, disk write behavior, and resulting segment/store metrics.
 
 # 2. Question
 
@@ -16,6 +16,7 @@ How long does force merge take on the same data with different storage settings?
 Bind-mounted Elasticsearch data will produce different force-merge duration and disk write behavior than a Docker named volume for the same dataset and index settings.
 
 ```yaml
+claim: bind_mount changes force_merge_duration or disk_write_bytes compared with named_volume
 null: bind_mount force_merge_duration and disk_write_bytes are not materially different from named_volume
 alternative: bind_mount force_merge_duration or disk_write_bytes differ materially from named_volume
 tail: two_tailed
@@ -27,16 +28,9 @@ tail: two_tailed
 baseline: named_volume
 candidates:
   - bind_mount
-independent:
+changed:
   - compose_storage_mode
-dependent:
-  - force_merge_duration
-  - disk_write_bytes
-  - cpu_percent
-  - merge_time
-  - resulting_segment_count
-  - resulting_store_size
-controlled:
+controls:
   - elasticsearch_version
   - heap_size
   - dataset
@@ -59,40 +53,40 @@ dataset:
   loader: espipe
   input: ./data/logs.ndjson
   target: logs-benchmark-default
-  default_settings:
+  settings:
     number_of_shards: 1
     number_of_replicas: 0
 variations:
   named_volume:
-    compose:
-      storage:
-        type: named_volume
+    config:
+      compose:
+        storage:
+          type: named_volume
   bind_mount:
-    compose:
-      storage:
-        type: bind_mount
-        path: ./var/esdata
-benchmark:
+    config:
+      compose:
+        storage:
+          type: bind_mount
+          path: ./var/esdata
+evaluation:
   repeats: 3
-  randomize_variation_order: true
-  phases:
-    - name: force_merge
-      runner: elasticsearch_api
-      config:
-        method: POST
-        path: /logs-benchmark-default/_forcemerge?max_num_segments=1&wait_for_completion=true
-isolation:
-  mode: reset_between_variations
+  order: randomized
   reset:
     - delete_indices
     - delete_volumes
     - reload_dataset
+  phases:
+    - name: force_merge
+      tool: elasticsearch_api
+      with:
+        method: POST
+        path: /logs-benchmark-default/_forcemerge?max_num_segments=1&wait_for_completion=true
 ```
 
 # 6. Measurement Plan
 
 ```yaml
-metrics:
+measure:
   primary:
     - force_merge_duration
     - disk_write_bytes
@@ -104,38 +98,43 @@ metrics:
     - heap_used_percent
     - gc_time
     - disk_read_bytes
-diagnostics:
-  collector: esdiag
-  collections:
-    before_phase:
-      apis:
-        - _cluster/health
-        - _nodes/stats
-    after_phase:
-      apis:
-        - _nodes/stats
-        - _stats
-        - _cat/segments?format=json
-comparison:
+  diagnostics:
+    tool: esdiag
+    at:
+      before_phase:
+        apis:
+          - _cluster/health
+          - _nodes/stats
+      after_phase:
+        apis:
+          - _nodes/stats
+          - _stats
+          - _cat/segments?format=json
+compare:
   baseline: named_volume
   candidates:
     - bind_mount
-  dimensions:
-    - variation
-    - repeat
-  statistical_plan:
-    test: bootstrap
+  changed:
+    - compose_storage_mode
+  controls:
+    - elasticsearch_version
+    - heap_size
+    - dataset
+    - index_settings
+    - compose_engine
+  analysis:
+    method: bootstrap
     tail: two_tailed
-    significance_level: 0.05
-    confidence_level: 0.95
-    minimum_effect_size:
+    alpha: 0.05
+    confidence: 0.95
+    effect:
       force_merge_duration: 10%
       disk_write_bytes: 10%
     assumptions:
       - delete_volumes and reload_dataset reset storage state between variations
       - force merge timings may be non-normal
-    multiple_comparison_correction: false
-  decision_rule: Accept the hypothesis if bind_mount differs from named_volume in force_merge_duration or disk_write_bytes by at least 10% across repeats.
+    multiple_comparisons: false
+  decision: Accept the hypothesis if bind_mount differs from named_volume in force_merge_duration or disk_write_bytes by at least 10% across repeats.
 ```
 
 # 7. Interpretation

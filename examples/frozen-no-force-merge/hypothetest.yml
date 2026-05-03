@@ -1,142 +1,130 @@
-apiVersion: hypothetest.elastic/v1
-kind: BenchmarkScenario
-metadata:
-  name: frozen-no-force-merge-search-cost
-  owner: search-storage
-spec:
-  question: How much slower is search on frozen when not force merging?
-  deployment:
-    target: compose
-    engine: auto
-    elasticsearch:
-      version: 8.18.0
-      security: false
-      heap: 2g
-      memory: 4g
-    services:
-      kibana: false
-    repositories:
-      bench-repo:
-        type: fs
-        location: /usr/share/elasticsearch/snapshots/bench-repo
-  dataset:
-    loader: espipe
-    input: ./data/http_logs.ndjson
-    target: logs-benchmark-default
-    index_template: ./templates/logs.json
-    default_settings:
-      number_of_shards: 1
-      number_of_replicas: 0
-  setup: []
-  variations:
-    force_merged:
-      setup:
-        - type: elasticsearch_api
-          method: POST
-          path: /logs-benchmark-default/_forcemerge?max_num_segments=1
-        - type: snapshot
-          repository: bench-repo
-          snapshot: logs-force-merged
-        - type: mount_searchable_snapshot
-          tier: frozen
-    not_force_merged:
-      setup:
-        - type: snapshot
-          repository: bench-repo
-          snapshot: logs-not-force-merged
-        - type: mount_searchable_snapshot
-          tier: frozen
-  benchmark:
-    repeats: 3
-    randomize_variation_order: true
-    phases:
-      - name: cold_search
-        runner: rally
-        config:
-          track: ./tracks/frozen-search
-          challenge: cold-cache
-      - name: warm_search
-        runner: rally
-        config:
-          track: ./tracks/frozen-search
-          challenge: warm-cache
-  isolation:
-    mode: reset_between_variations
-    reset:
-      - delete_indices
-      - clear_caches
-      - reload_dataset
-      - verify_cluster_green
-  metrics:
-    primary:
-      - search_latency_p50
-      - search_latency_p90
-      - search_latency_p99
-      - throughput
-      - repository_bytes_read
-      - searchable_snapshot_cache_hit_rate
-      - segment_count
-    secondary:
-      - cpu_percent
-      - heap_used_percent
-      - gc_time
-      - disk_read_bytes
-      - disk_write_bytes
+name: frozen-no-force-merge-search-cost
+owner: search-storage
+question: How much slower is search on frozen when not force merging?
+hypothesis:
+  claim: not_force_merged increases p99 latency and repository bytes read compared with force_merged
+  "null": not_force_merged p99 latency and repository bytes read are not materially higher than force_merged
+  alternative: not_force_merged p99 latency and repository bytes read are materially higher than force_merged
+  tail: one_tailed
+
+deployment:
+  target: compose
+  engine: auto
+  elasticsearch:
+    version: 8.18.0
+    security: false
+    heap: 2g
+    memory: 4g
+  services:
+    kibana: false
+  repositories:
+    bench-repo:
+      type: fs
+      location: /usr/share/elasticsearch/snapshots/bench-repo
+
+dataset:
+  loader: espipe
+  input: ./data/http_logs.ndjson
+  target: logs-benchmark-default
+  index_template: ./templates/logs.json
+  settings:
+    number_of_shards: 1
+    number_of_replicas: 0
+
+variations:
+  force_merged:
+    setup:
+      - type: elasticsearch_api
+        method: POST
+        path: /logs-benchmark-default/_forcemerge?max_num_segments=1
+      - type: snapshot
+        repository: bench-repo
+        snapshot: logs-force-merged
+      - type: mount_searchable_snapshot
+        tier: frozen
+  not_force_merged:
+    setup:
+      - type: snapshot
+        repository: bench-repo
+        snapshot: logs-not-force-merged
+      - type: mount_searchable_snapshot
+        tier: frozen
+
+evaluation:
+  repeats: 3
+  order: randomized
+  reset:
+    - delete_indices
+    - clear_caches
+    - reload_dataset
+    - verify_cluster_green
+  phases:
+    - name: cold_search
+      tool: rally
+      with:
+        track: ./tracks/frozen-search
+        challenge: cold-cache
+    - name: warm_search
+      tool: rally
+      with:
+        track: ./tracks/frozen-search
+        challenge: warm-cache
+
+measure:
+  primary:
+    - search_latency_p50
+    - search_latency_p90
+    - search_latency_p99
+    - throughput
+    - repository_bytes_read
+    - searchable_snapshot_cache_hit_rate
+    - segment_count
+  secondary:
+    - cpu_percent
+    - heap_used_percent
+    - gc_time
+    - disk_read_bytes
+    - disk_write_bytes
   diagnostics:
-    collector: esdiag
-    collections:
+    tool: esdiag
+    at:
       after_phase:
         apis:
           - _nodes/stats
           - _stats
           - _cat/segments?format=json
-  comparison:
-    hypothesis:
-      "null": not_force_merged p99 latency and repository bytes read are not materially higher than force_merged
-      alternative: not_force_merged p99 latency and repository bytes read are materially higher than force_merged
-      tail: one_tailed
-    baseline: force_merged
-    candidates:
-      - not_force_merged
-    independent:
-      - force_merge_before_snapshot
-    dependent:
-      - search_latency_p50
-      - search_latency_p90
-      - search_latency_p99
-      - throughput
-      - repository_bytes_read
-      - searchable_snapshot_cache_hit_rate
-      - segment_count
-    controlled:
-      - elasticsearch_version
-      - heap_size
-      - dataset
-      - query_mix
-      - shard_count
-      - replica_count
-      - snapshot_repository
-    dimensions:
-      - variation
-      - phase
-      - query_name
-      - repeat
-    statistical_plan:
-      test: bootstrap
-      tail: one_tailed
-      significance_level: 0.05
-      confidence_level: 0.95
-      minimum_effect_size:
-        search_latency_p99: 10%
-        repository_bytes_read: 10%
-      assumptions:
-        - reset_between_variations makes repeats independent enough for exploratory comparison
-        - latency and repository-read distributions may be skewed
-      multiple_comparison_correction: false
-    decision_rule: Reject the hypothesis only if not_force_merged p99 latency and repository bytes read are not materially higher than force_merged across measured search phases.
-  report:
-    formats:
-      - markdown
-      - toon
-      - charts
-    interpretation: If the not-force-merged candidate shows higher p99 latency and repository reads, the result supports force merging before snapshot for this workload. If not, force merge may not be justified for this dataset and query mix. Conclusions are limited to the compose deployment, Elasticsearch 8.18.0, the declared heap, this filesystem repository, and the provided frozen-search workload.
+
+compare:
+  baseline: force_merged
+  candidates:
+    - not_force_merged
+  changed:
+    - force_merge_before_snapshot
+  controls:
+    - elasticsearch_version
+    - heap_size
+    - dataset
+    - query_mix
+    - shard_count
+    - replica_count
+    - snapshot_repository
+  analysis:
+    method: bootstrap
+    tail: one_tailed
+    alpha: 0.05
+    confidence: 0.95
+    effect:
+      search_latency_p99: 10%
+      repository_bytes_read: 10%
+    assumptions:
+      - reset_between_variations makes repeats independent enough for exploratory comparison
+      - latency and repository-read distributions may be skewed
+    multiple_comparisons: false
+  decision: Reject the hypothesis only if not_force_merged p99 latency and repository bytes read are not materially higher than force_merged across measured search phases.
+
+report:
+  formats:
+    - markdown
+    - toon
+    - charts
+  limits: If the not-force-merged candidate shows higher p99 latency and repository reads, the result supports force merging before snapshot for this workload. If not, force merge may not be justified for this dataset and query mix. Conclusions are limited to the compose deployment, Elasticsearch 8.18.0, the declared heap, this filesystem repository, and the provided frozen-search workload.

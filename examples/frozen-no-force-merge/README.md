@@ -18,6 +18,6 @@ This blueprint compares frozen searchable snapshot search cost with and without 
 - `hypothetest.yml`: canonical compiled plan.
 - `blueprint.yml`: portable blueprint manifest.
 
-## Run
+## Evaluation
 
 Use the Hypothetest Operator from this blueprint root so relative paths resolve correctly.

@@ -1,0 +1,42 @@
+# logsdb index template with synthetic _source — requires enterprise or trial license.
+# In ES 9.x, synthetic source is declared via the index setting
+# index.mapping.source.mode: synthetic (NOT mappings._source.mode).
+# Combined with index.mode: logsdb this eliminates the stored _source entirely;
+# the document source is reconstructed from doc values at read time.
+#
+# Apply with:
+#   PUT /_index_template/yelp-reviews-logsdb-synthetic-source
+
+name: yelp-reviews-logsdb-synthetic-source
+index_patterns:
+  - yelp-reviews-logsdb-synthetic-source
+priority: 200
+template:
+  settings:
+    number_of_shards: 1
+    number_of_replicas: 0
+    index.mode: logsdb
+    index.mapping.source.mode: synthetic
+    default_pipeline: yelp-reviews-date-to-timestamp
+  mappings:
+    dynamic: false
+    properties:
+      review_id:
+        type: keyword
+      user_id:
+        type: keyword
+      business_id:
+        type: keyword
+      stars:
+        type: float
+      useful:
+        type: integer
+      funny:
+        type: integer
+      cool:
+        type: integer
+      text:
+        type: text
+      "@timestamp":
+        type: date
+        format: "yyyy-MM-dd HH:mm:ss"

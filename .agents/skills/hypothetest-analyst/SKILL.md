@@ -1,22 +1,29 @@
 ---
 name: hypothetest-analyst
-description: Analyze Hypothetest Elasticsearch benchmark run artifacts. Use when the user wants a report, metric comparison, TOON summary, caveats, interpretation, or verification of benchmark results across variations.
+description: Analyze Hypothetest Elasticsearch benchmark evaluation artifacts. Use when the user wants a report, metric comparison, TOON summary, caveats, interpretation, or verification of benchmark results across variations.
 ---
 
 # Hypothetest Analyst Skill
 
 You are the analyst for Hypothetest.
 
-Your job is to interpret completed or partial run artifacts. Do not rerun benchmarks unless explicitly asked. Preserve uncertainty and separate facts from interpretation.
+Your job is to interpret completed or partial evaluation artifacts. Do not re-execute benchmarks unless explicitly asked. Preserve uncertainty and separate facts from interpretation.
 
 ## Input
 
 ```text
-runs/<scenario>/<timestamp>/
+evaluations/<hypothesis-name>/<timestamp>/
 ```
+
+## Schema dependency
+
+The Analyst consumes evaluation output produced by the Operator. When
+cross-skill references are available, validate `evaluation.yml` with the
+Operator skill's bundled `schemas/evaluation.schema.yaml`.
 
 Expected files:
 
+- `evaluation.yml`
 - `manifest.toon`
 - `hypothesis.md`
 - `hypothetest.yml`
@@ -26,8 +33,8 @@ Expected files:
 
 Supported command aliases:
 
-- `/hypothetest:analyst runs/<run-id>`
-- `/hypothetest:verify runs/<run-id>`
+- `/hypothetest:analyst evaluations/<evaluation-id>`
+- `/hypothetest:verify evaluations/<evaluation-id>`
 
 ## Outputs
 
@@ -41,11 +48,11 @@ charts/
 appendix/
 ```
 
-Write outputs into the run directory unless the user explicitly requests another destination.
+Write outputs into the evaluation directory unless the user explicitly requests another destination.
 
 ## Analysis workflow
 
-1. Load run manifest and canonical plan.
+1. Load `evaluation.yml`, `manifest.toon`, and the canonical plan.
 2. Identify baseline and candidate variations.
 3. Verify all expected variations, repeats, and phases completed.
 4. Normalize metrics into a comparison table.
@@ -54,7 +61,7 @@ Write outputs into the run directory unless the user explicitly requests another
 7. Identify outliers, failed phases, missing data, and state leakage risks.
 8. Write a clear finding with caveats.
 
-If the run is partial, analyze completed data but lead with missing or failed phases. Do not hide failed repeats in averages.
+If the evaluation is partial, analyze completed data but lead with missing or failed phases. Do not hide failed repeats in averages.
 
 ## Required report sections
 
@@ -63,7 +70,7 @@ If the run is partial, analyze completed data but lead with missing or failed ph
 
 # What was compared
 
-# Run quality
+# Evaluation quality
 
 # Primary metrics
 
@@ -84,10 +91,10 @@ Use these deployment quality labels:
 - `existing`: environment-dependent
 - `elastic-cloud`: benchmark-grade, assuming isolation and repeatability controls are satisfied
 
-For compose runs, include:
+For compose evaluations, include:
 
 ```markdown
-This run used the `compose` deployment target. Results are useful for validating scenario behavior and relative workflow mechanics, but should not be treated as production performance evidence without follow-up on a controlled environment.
+This evaluation used the `compose` deployment target. Results are useful for validating scenario behavior and relative workflow mechanics, but should not be treated as production performance evidence without follow-up on a controlled environment.
 ```
 
 ## Comparison rules
@@ -95,7 +102,7 @@ This run used the `compose` deployment target. Results are useful for validating
 Use the scenario's declared comparison:
 
 ```yaml
-comparison:
+compare:
   baseline: baseline_name
   candidates:
     - candidate_name
@@ -161,8 +168,8 @@ comparisons[1]{scenario,baseline,candidate,phase,metric,baseline_value,candidate
 Create or preserve normalized metric rows when available:
 
 ```toon
-metrics[1]{scenario,run_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
-  example,run-001,compose,baseline,1,warm_search,search_latency_p99,100,ms,rally,ok
+metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
+  example,evaluation-001,compose,baseline,1,warm_search,search_latency_p99,100,ms,rally,ok
 ```
 
 ## Interpretation guidance
@@ -173,7 +180,7 @@ metrics[1]{scenario,run_id,deployment_target,variation,repeat,phase,metric,value
 - For frozen/searchable snapshot tests, focus on search latency, throughput, repository reads, cache behavior, and segment count.
 - Treat `esdiag` diagnostic bundles or processed results-cluster documents as the primary source for Elasticsearch node, cluster, index, segment, cache, and repository diagnostics.
 - Report failed or missing data prominently.
-- For compose runs, explicitly state that results are development-grade and should not be treated as production performance evidence.
+- For compose evaluations, explicitly state that results are development-grade and should not be treated as production performance evidence.
 - Mention likely confounders such as cache state, noisy local resources, repository variability, JVM warmup, shard allocation, repeat count, and state leakage.
 
 ## References

@@ -1,7 +1,7 @@
 interface:
   display_name: "Hypothetest Coordinator"
-  short_description: "Prepare credentials and tools for runs"
+  short_description: "Prepare credentials and tools for evaluations"
   brand_color: "#00BFB3"
-  default_prompt: "Use $hypothetest-coordinator to check credentials, local tools, and readiness before running a blueprint."
+  default_prompt: "Use $hypothetest-coordinator to check credentials, local tools, and readiness before evaluating a blueprint."
 policy:
   allow_implicit_invocation: true

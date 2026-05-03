@@ -3,8 +3,8 @@
 Normalize metrics to TOON rows shaped like:
 
 ```toon
-metrics[1]{scenario,run_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
-  example,run-001,compose,baseline,1,warm_search,search_latency_p99,100,ms,rally,ok
+metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
+  example,evaluation-001,compose,baseline,1,warm_search,search_latency_p99,100,ms,rally,ok
 ```
 
 Comparison rows should include:

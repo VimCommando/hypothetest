@@ -16,6 +16,7 @@ How much does each index mode and codec/sorting combination reduce on-disk index
 `logsdb` mode will reduce index store size by more than 10% compared with `standard` mode on the Yelp review corpus. Applying `best_compression` codec to `standard` mode will also reduce store size by more than 10%. Combining `best_compression` with index sorting on `standard` mode will reduce store size by more than 10%. At least one variation will achieve >10% storage reduction without more than 20% indexing throughput degradation.
 
 ```yaml
+claim: at least one candidate reduces store size by more than 10% without more than 20% indexing throughput degradation
 "null": no variation achieves more than 10% smaller store size than standard after force-merge
 alternative: at least one variation achieves more than 10% smaller store size than standard after force-merge
 tail: one_tailed
@@ -27,21 +28,14 @@ tail: one_tailed
 baseline: standard
 candidates:
   - logsdb
+  - logsdb_synthetic_source
   - standard_best_compression
   - standard_best_compression_sorted
-independent:
+changed:
   - index_mode
   - codec
   - index_sorting
-dependent:
-  - store_size_after_load
-  - store_size_after_force_merge
-  - indexing_throughput_docs_per_sec
-secondary_dependent:
-  - segment_count_after_load
-  - segment_count_after_force_merge
-  - force_merge_duration_sec
-controlled:
+controls:
   - elasticsearch_version
   - heap_size
   - dataset
@@ -71,106 +65,118 @@ deployment:
     auth:
       method: ssh_certificate
       ssh_config_host: ironhide.local
-    workdir: /tmp/hypothetest/runs
+    workdir: /tmp/hypothetest/evaluations
 
 dataset:
   loader: espipe
   input: datasets/yelp/yelp_academic_dataset_review.json
+  target: benchmark-index
   options:
     batch_size: 5000
   fixture:
-    mode: dynamic
     description: >
       Yelp Academic Dataset review corpus (NDJSON). Must be present at the
       declared path on the remote host before execution. The Coordinator
-      must verify the file exists and is readable before the Operator runs.
+      must verify the file exists and is readable before the Operator executes the evaluation.
 
 setup: []
 
 variations:
   standard:
     description: Default index mode, LZ4 codec, no index sorting.
-    load_config:
-      template: templates/base-template.yml
-      template_name: yelp-reviews-standard
+    config:
+      load:
+        template: templates/base-template.yml
+        template_name: yelp-reviews-standard
 
   logsdb:
     description: >
-      logsdb index mode with synthetic _source, LZ4 codec. Uses the
+      logsdb index mode, LZ4 codec, stored _source. Uses the
       yelp-reviews-logsdb index template and the yelp-reviews-date-to-timestamp
       ingest pipeline to rename the corpus `date` field to `@timestamp`
       as required by logsdb.
-    load_config:
-      template: templates/logsdb-template.yml
-      template_name: yelp-reviews-logsdb
-      pipeline: templates/pipeline-date-to-timestamp.yml
-      pipeline_name: yelp-reviews-date-to-timestamp
+    config:
+      load:
+        template: templates/logsdb-template.yml
+        template_name: yelp-reviews-logsdb
+        pipeline: templates/pipeline-date-to-timestamp.yml
+        pipeline_name: yelp-reviews-date-to-timestamp
+
+  logsdb_synthetic_source:
+    description: >
+      logsdb index mode with synthetic _source explicitly enabled, LZ4 codec.
+      Requires an enterprise or trial license.
+    config:
+      load:
+        template: templates/logsdb-synthetic-source-template.yml
+        template_name: yelp-reviews-logsdb-synthetic-source
+        pipeline: templates/pipeline-date-to-timestamp.yml
+        pipeline_name: yelp-reviews-date-to-timestamp
+    prerequisites:
+      - enterprise_or_trial_license
 
   standard_best_compression:
     description: Standard index mode with ZSTD (best_compression) codec.
-    load_config:
-      template: templates/standard-best-compression-template.yml
-      template_name: yelp-reviews-standard-best-compression
+    config:
+      load:
+        template: templates/standard-best-compression-template.yml
+        template_name: yelp-reviews-standard-best-compression
 
   standard_best_compression_sorted:
     description: >
       Standard index mode with ZSTD codec and index sorting by business_id
       ascending. Sorting by a high-cardinality keyword field improves
       compression locality by co-locating documents with the same business.
-    load_config:
-      template: templates/standard-best-compression-sorted-template.yml
-      template_name: yelp-reviews-standard-best-compression-sorted
+    config:
+      load:
+        template: templates/standard-best-compression-sorted-template.yml
+        template_name: yelp-reviews-standard-best-compression-sorted
 
-benchmark:
+evaluation:
   repeats: 3
-  randomize_variation_order: true
+  order: randomized
+  reset:
+    - delete_indices
+    - clear_caches
+    - reload_dataset
+    - verify_cluster_green
   phases:
     - name: load_data
-      runner: espipe
-      config:
+      tool: espipe
+      with:
         input: datasets/yelp/yelp_academic_dataset_review.json
         target: http://ironhide.local:9200/benchmark-index
         batch_size: 5000
-        # --template and --template-name resolved per variation from load_config.
-        # logsdb additionally passes --pipeline and --pipeline-name.
 
     - name: collect_store_after_load
-      runner: elasticsearch_api
-      config:
+      tool: elasticsearch_api
+      with:
         request:
           method: GET
           path: /benchmark-index/_stats/store,segments
         artifact: store_after_load.json
 
     - name: force_merge
-      runner: elasticsearch_api
-      config:
+      tool: elasticsearch_api
+      with:
         request:
           method: POST
           path: /benchmark-index/_forcemerge?max_num_segments=1&wait_for_completion=true
         artifact: force_merge_result.json
 
     - name: collect_store_after_force_merge
-      runner: elasticsearch_api
-      config:
+      tool: elasticsearch_api
+      with:
         request:
           method: GET
           path: /benchmark-index/_stats/store,segments
         artifact: store_after_force_merge.json
-
-isolation:
-  mode: reset_between_variations
-  reset:
-    - delete_indices
-    - clear_caches
-    - reload_dataset
-    - verify_cluster_green
 ```
 
 # 6. Measurement Plan
 
 ```yaml
-metrics:
+measure:
   primary:
     - name: store_size_after_force_merge
       unit: bytes
@@ -213,54 +219,66 @@ metrics:
       artifact: force_merge_result.json
       field: took
       phase: force_merge
+  diagnostics:
+    tool: esdiag
+    at:
+      before_load:
+        apis:
+          - _cluster/health
+          - _nodes/stats
+          - _cat/nodes?v&format=json
 
-diagnostics:
-  collector: esdiag
-  collections:
-    before_load:
-      apis:
-        - _cluster/health
-        - _nodes/stats
-        - _cat/nodes?v&format=json
+      after_load:
+        apis:
+          - _nodes/stats
+          - _stats
+          - _cat/segments?format=json
+          - _cat/indices?v&format=json
 
-    after_load:
-      apis:
-        - _nodes/stats
-        - _stats
-        - _cat/segments?format=json
-        - _cat/indices?v&format=json
+      after_force_merge:
+        apis:
+          - _nodes/stats
+          - _stats
+          - _cat/segments?format=json
+          - _cat/indices?v&format=json
 
-    after_force_merge:
-      apis:
-        - _nodes/stats
-        - _stats
-        - _cat/segments?format=json
-        - _cat/indices?v&format=json
-
-comparison:
+compare:
   baseline: standard
   candidates:
     - logsdb
+    - logsdb_synthetic_source
     - standard_best_compression
     - standard_best_compression_sorted
-  statistical_plan:
-    test: bootstrap
+  changed:
+    - index_mode
+    - codec
+    - index_sorting
+  controls:
+    - elasticsearch_version
+    - heap_size
+    - dataset
+    - document_count
+    - shard_count
+    - replica_count
+    - bulk_batch_size
+  analysis:
+    method: bootstrap
     tail: one_tailed
-    significance_level: 0.05
-    confidence_level: 0.95
-    minimum_effect_size:
+    alpha: 0.05
+    confidence: 0.95
+    effect:
       store_size_after_force_merge: 10%
       indexing_throughput_docs_per_sec: 20%
     assumptions:
       - variation resets (delete_indices + clear_caches + reload_dataset) make repeated measurements sufficiently independent
       - store size measurements are deterministic for the same dataset and settings; variance across repeats reflects JVM and OS caching noise
       - indexing throughput may vary due to remote host load; three repeats are exploratory
-    multiple_comparison_correction: bonferroni
-    multiple_comparison_note: >
-      Three candidates are tested against one baseline on two primary metrics.
+    multiple_comparisons: bonferroni
+    note: >
+      Four candidates are tested against one baseline on two primary metrics.
       Bonferroni correction is applied to the family of store_size comparisons.
       Throughput comparisons are treated as secondary and exploratory.
-  decision_rule: >
+  decision: >
     Accept the alternative hypothesis for a candidate if its store_size_after_force_merge
     is more than 10% smaller than the standard baseline (after Bonferroni correction,
     adjusted alpha = 0.0167) AND its indexing_throughput_docs_per_sec is no more than
@@ -274,7 +292,7 @@ Results apply only to:
 
 - **Workload**: bulk-load of the Yelp Academic Dataset review corpus via espipe, single-shard, no replicas, no concurrent search.
 - **Dataset**: Yelp review documents (text-heavy, variable-length, with a high-cardinality `business_id` keyword field). Results may not generalize to metrics, traces, or time-series data.
-- **Deployment**: single-node Elasticsearch running in Podman on a remote host (`ironhide.local`) via compose. Results are development-grade and should not be used to make production capacity decisions without re-running on representative hardware.
+- **Deployment**: single-node Elasticsearch executing in Podman on a remote host (`ironhide.local`) via compose. Results are development-grade and should not be used to make production capacity decisions without re-evaluating on representative hardware.
 - **Elasticsearch version**: 9.3.3.
 - **Index sorting caveat**: `index.sort.field: business_id` requires that documents contain a `business_id` keyword field. The Yelp review corpus includes this field natively. If the corpus is replaced with a different dataset, verify field presence before execution.
 - **logsdb caveat**: `logsdb` mode uses synthetic `_source`. If downstream consumers rely on stored `_source` fields that are not reconstructable from doc values, this mode is not suitable regardless of storage savings.

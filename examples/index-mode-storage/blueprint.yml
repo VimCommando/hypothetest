@@ -1,34 +1,29 @@
-apiVersion: hypothetest.elastic/v1
-kind: Blueprint
-metadata:
-  name: index-mode-storage
-  owner: storage
-spec:
-  hypothesis: hypothesis.md
-  plan: hypothetest.yml
-  readme: README.md
-  portability:
-    self_contained: false
-    expected_runtime: 60m
-    prerequisites:
-      - podman
-      - espipe >= 0.3.0
-      - esdiag
-      - ssh certificate access to remote host (ironhide.local via ~/.ssh/config)
+name: index-mode-storage
+owner: storage
+hypothesis: hypothesis.md
+plan: hypothetest.yml
+readme: README.md
+self_contained: false
+expected_runtime: 60m
+prerequisites:
+  - podman
+  - espipe >= 0.3.0
+  - esdiag
+  - ssh certificate access to remote host (ironhide.local via ~/.ssh/config)
+include:
   directories:
-    templates: templates/
-    diagnostics: diagnostics/
-    generated: generated/
-  datasets:
-    - name: yelp-reviews
-      mode: static
-      path: datasets/yelp/yelp_academic_dataset_review.json
-      format: jsonl
-      target: benchmark-index
-      description: >
-        Yelp Academic Dataset review corpus (NDJSON). Must be present on the
-        remote host at datasets/yelp/yelp_academic_dataset_review.json relative
-        to the Operator workdir before execution. Not included in this blueprint.
-  archive:
-    format: zip
-    include_runs: false
+    - templates/
+    - diagnostics/
+    - generated/
+datasets:
+  - name: yelp-reviews
+    path: datasets/yelp/yelp_academic_dataset_review.json
+    format: jsonl
+    target: benchmark-index
+    description: >
+      Yelp Academic Dataset review corpus (NDJSON). Must be present on the
+      remote host at datasets/yelp/yelp_academic_dataset_review.json relative
+      to the Operator workdir before execution. Not included in this blueprint.
+archive:
+  format: zip
+  include_evaluations: false

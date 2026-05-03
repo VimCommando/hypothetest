@@ -28,10 +28,10 @@ remote:
   auth:
     method: ssh_certificate
     ssh_config_host: bench-host
-  workdir: /srv/hypothetest/runs
+  workdir: /srv/hypothetest/evaluations
 ```
 
-The remote SSH username may be declared with `remote.user`. The Coordinator must verify SSH access through the user's `.ssh/config` and permission to run the selected remote compose command before the Operator runs the hypothesis.
+The remote SSH username may be declared with `remote.user`. The Coordinator must verify SSH access through the user's `.ssh/config` and permission to execute the selected remote compose command before the Operator evaluates the hypothesis.
 
 Default generated files:
 

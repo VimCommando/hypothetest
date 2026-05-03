@@ -1,4 +1,4 @@
-# Operator Runbook — index-mode-storage
+# Operator Evaluation Guide — index-mode-storage
 
 **Blueprint**: `blueprints/index-mode-storage/`
 **Grade**: Development-grade (remote compose, single-node)
@@ -8,21 +8,21 @@
 
 ## Prerequisites
 
-Before running this benchmark, verify:
+Before evaluating this benchmark, verify:
 
-- [ ] Podman is installed and running on the remote host (`ironhide.local`)
+- [ ] Podman is installed and available on the remote host (`ironhide.local`)
 - [ ] SSH certificate access to `ironhide.local` is configured in `~/.ssh/config`
-- [ ] The remote user (`benchmark`) has permission to run `podman` and `podman compose`
-- [ ] `espipe` >= 0.3.0 is installed and on PATH on the machine running the Operator
-- [ ] `esdiag` is installed and on PATH on the machine running the Operator
+- [ ] The remote user (`benchmark`) has permission to execute `podman` and `podman compose`
+- [ ] `espipe` >= 0.3.0 is installed and on PATH on the machine executing the Operator
+- [ ] `esdiag` is installed and on PATH on the machine executing the Operator
 - [ ] The Yelp review corpus exists on the remote host at:
        `datasets/yelp/yelp_academic_dataset_review.json`
-      (relative to the Operator workdir `/tmp/hypothetest/runs`)
+      (relative to the Operator workdir `/tmp/hypothetest/evaluations`)
 - [ ] The Yelp review documents contain a `business_id` keyword field (required for
       `standard_best_compression_sorted`). This field is present natively in the
       Yelp Academic Dataset.
 
-Run the Coordinator readiness check before proceeding:
+Execute the Coordinator readiness check before proceeding:
 
 ```sh
 hypothetest coordinator check --blueprint blueprints/index-mode-storage/
@@ -43,7 +43,7 @@ hypothetest coordinator check --blueprint blueprints/index-mode-storage/
 
 ---
 
-## Setup (once per run, before any variation)
+## Setup (once per evaluation, before any variation)
 
 There is no separate setup phase. `setup: []` in `hypothetest.yml`.
 
@@ -56,7 +56,7 @@ documents. No manual `curl` setup is required.
 
 ## Execution Steps (per variation, per repeat)
 
-The Operator runs each variation in randomized order, 3 times total.
+The Operator evaluates each variation in randomized order, 3 times total.
 
 ### 1. Reset
 
@@ -125,7 +125,7 @@ espipe \
 esdiag collect \
   --host http://ironhide.local:9200 \
   --apis "_cluster/health,_nodes/stats,_cat/nodes?v&format=json" \
-  --output runs/<variation>/<repeat>/esdiag/before_load.zip
+  --output evaluations/index-mode-storage/<timestamp>/<variation>/<repeat>/esdiag/before_load.zip
 ```
 
 ### 4. Collect diagnostics: after_load
@@ -134,14 +134,14 @@ esdiag collect \
 esdiag collect \
   --host http://ironhide.local:9200 \
   --apis "_nodes/stats,_stats,_cat/segments?format=json,_cat/indices?v&format=json" \
-  --output runs/<variation>/<repeat>/esdiag/after_load.zip
+  --output evaluations/index-mode-storage/<timestamp>/<variation>/<repeat>/esdiag/after_load.zip
 ```
 
 ### 5. Collect store stats after load
 
 ```sh
 curl http://ironhide.local:9200/benchmark-index/_stats/store,segments \
-  > runs/<variation>/<repeat>/store_after_load.json
+  > evaluations/index-mode-storage/<timestamp>/<variation>/<repeat>/store_after_load.json
 ```
 
 ### 6. Force-merge to 1 segment
@@ -149,14 +149,14 @@ curl http://ironhide.local:9200/benchmark-index/_stats/store,segments \
 ```sh
 curl -X POST \
   "http://ironhide.local:9200/benchmark-index/_forcemerge?max_num_segments=1&wait_for_completion=true" \
-  > runs/<variation>/<repeat>/force_merge_result.json
+  > evaluations/index-mode-storage/<timestamp>/<variation>/<repeat>/force_merge_result.json
 ```
 
 ### 7. Collect store stats after force-merge
 
 ```sh
 curl http://ironhide.local:9200/benchmark-index/_stats/store,segments \
-  > runs/<variation>/<repeat>/store_after_force_merge.json
+  > evaluations/index-mode-storage/<timestamp>/<variation>/<repeat>/store_after_force_merge.json
 ```
 
 ### 8. Collect diagnostics: after_force_merge
@@ -165,7 +165,7 @@ curl http://ironhide.local:9200/benchmark-index/_stats/store,segments \
 esdiag collect \
   --host http://ironhide.local:9200 \
   --apis "_nodes/stats,_stats,_cat/segments?format=json,_cat/indices?v&format=json" \
-  --output runs/<variation>/<repeat>/esdiag/after_force_merge.zip
+  --output evaluations/index-mode-storage/<timestamp>/<variation>/<repeat>/esdiag/after_force_merge.zip
 ```
 
 ---
@@ -179,18 +179,19 @@ podman compose -f generated/compose/compose.yml --env-file generated/compose/.en
 # Wait for green
 curl -s http://ironhide.local:9200/_cluster/health?wait_for_status=green&timeout=60s
 
-# Stop and remove volumes (between full variation runs if needed)
+# Stop and remove volumes (between full variation evaluations if needed)
 podman compose -f generated/compose/compose.yml down -v
 ```
 
 ---
 
-## Run Artifact Layout
+## Evaluation Artifact Layout
 
 ```text
-runs/
+evaluations/
   index-mode-storage/
     <timestamp>/
+      evaluation.yml
       manifest.toon
       standard/
         1/
@@ -229,9 +230,9 @@ runs/
    those fields will not be retrievable. This does not affect the storage
    measurement but is a production consideration.
 
-4. **Development-grade results**: This benchmark runs on a single-node Podman
+4. **Development-grade results**: This benchmark evaluates on a single-node Podman
    cluster on a remote host. Results should not be used for production capacity
-   planning without re-running on representative hardware.
+   planning without re-evaluating on representative hardware.
 
 5. **Force-merge duration**: The `took` field in the `_forcemerge` response is
    in milliseconds. Convert to seconds when reporting.

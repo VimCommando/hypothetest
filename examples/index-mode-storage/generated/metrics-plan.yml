@@ -102,7 +102,7 @@ diagnostic_collections:
       - _cat/nodes?v&format=json
     purpose: >
       Baseline cluster state before any indexing. Captures node resource
-      state and confirms cluster is green before each variation run.
+      state and confirms cluster is green before each variation evaluation.
 
   after_load:
     trigger: after load_data phase, before force_merge phase

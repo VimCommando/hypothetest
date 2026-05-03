@@ -10,7 +10,7 @@ One-paragraph answer to the scenario question.
 | Variation | Key settings | Repeats | Status |
 |---|---|---:|---|
 
-# Run quality
+# Evaluation quality
 
 Deployment target, result quality, failures, missing metrics, isolation notes.
 
@@ -29,7 +29,7 @@ List limitations.
 
 # Reproduction
 
-Point to scenario, canonical YAML plan, TOON run manifest, and commands.
+Point to scenario, canonical YAML plan, TOON evaluation manifest, and commands.
 
 # Appendix
 

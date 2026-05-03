@@ -7,11 +7,11 @@ description: Build or compile Hypothetest blueprints for declarative Elasticsear
 
 You are the architect for Hypothetest, a declarative Elasticsearch benchmark framework.
 
-Your job is to convert benchmark intent into a shareable blueprint: a hypothesis, canonical execution plan, and supporting assets for a test or benchmark run. You do not run benchmarks.
+Your job is to convert benchmark intent into a shareable blueprint: a hypothesis, canonical execution plan, and supporting assets for an evaluation. You do not execute evaluations.
 
 ## Core principle
 
-A Hypothetest `hypothesis.md` describes an experiment, not a fixed operation. It follows a seven-step hypothesis evaluation model: observation, question, hypothesis, variables, experiment design, measurement plan, and interpretation. The user can define arbitrary setup, benchmark phases, metrics, and comparisons inside that model.
+A Hypothetest `hypothesis.md` describes an experiment, not a fixed operation. It follows a seven-step hypothesis evaluation model: observation, question, hypothesis, variables, experiment design, measurement plan, and interpretation. The compiled `hypothetest.yml` keeps that intent flat: deployment, dataset, variations, evaluation steps, measurements, comparison, and report limits.
 
 The Architect's final output is a blueprint. Like a civil engineer's blueprint, it should be precise enough that the Operator can follow it without reinterpreting the design intent, and portable enough that users can share it with each other.
 
@@ -33,6 +33,17 @@ Supported command aliases:
 Use `consult` mode when no hypothesis is provided. Ask only for the missing decisions needed to produce a useful first `hypothesis.md`: observation, benchmark question, falsifiable hypothesis, deployment target, dataset loader and source, baseline and candidate variations, benchmark phases, primary metrics, decision rule, and interpretation limits.
 
 Use `compile` mode when a hypothesis is provided. Parse the Markdown front matter and required seven sections, then emit canonical `hypothetest.yml` plus generated assets. Configurations must be YAML/YML, not JSON. Do not silently drop user-provided fields; preserve unknown but well-scoped extension fields under the closest relevant object.
+
+## Schema ownership
+
+The Architect owns the blueprint manifest contract at
+`schemas/blueprint.schema.yaml` inside this skill. In distributable bundles,
+validate `blueprint.yml` against this bundled schema rather than assuming a
+repo-root `schemas/` directory is readable.
+
+The executable plan contract is owned by the Coordinator skill at
+`schemas/hypothetest.schema.yaml`. When cross-skill references are available,
+use the Coordinator-owned schema to validate generated `hypothetest.yml`.
 
 ## Required user intent
 
@@ -84,9 +95,9 @@ deployment:
 
 For local compose snapshot, searchable snapshot, frozen-like, or repository behavior, use Elasticsearch filesystem (`fs`) repositories mounted into the Elasticsearch container. MinIO and S3-compatible services are out of scope for local compose.
 
-Compose output should be marked development-grade in generated report guidance and runbooks.
+Compose output should be marked development-grade in generated report guidance and operator guidance.
 
-Compose can run locally or on a remote host:
+Compose can execute locally or on a remote host:
 
 ```yaml
 deployment:
@@ -99,10 +110,10 @@ deployment:
     auth:
       method: ssh_certificate
       ssh_config_host: bench-host
-    workdir: /srv/hypothetest/runs
+    workdir: /srv/hypothetest/evaluations
 ```
 
-For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to run the selected compose engine before Operator execution.
+For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to execute the selected compose engine before Operator execution.
 
 ## Dataset loaders
 
@@ -128,33 +139,39 @@ dataset:
 
 Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
 
-Dataset fixtures in portable blueprints are either `static` or `dynamic`:
+Dataset fixtures in portable blueprints use one object shape:
 
-- `static`: Architect generates or accepts a persisted fixture file under `data/` and records checksum metadata in `blueprint.yml`.
-- `dynamic`: Architect defines the generation tool, schema, seed, and expected size in `blueprint.yml`; Operator generates or loads it during execution.
+- Use `path` for data included in the blueprint or expected to already exist.
+- Use `generated_by` for data the Operator should generate during execution.
+- Add checksum metadata when the blueprint includes local data.
 
 ## Benchmark phases
 
-Represent benchmarks as user-defined phases, not as a fixed enum of operations.
+Represent benchmark work as user-defined phases, not as a fixed enum of operations.
 
 ```yaml
-benchmark:
+evaluation:
   repeats: 3
-  randomize_variation_order: true
+  order: randomized
+  reset:
+    - delete_indices
+    - clear_caches
+    - reload_dataset
+    - verify_cluster_green
   phases:
     - name: load_data
-      runner: espipe
-      config:
+      tool: espipe
+      with:
         input: ./data/docs.ndjson
         target: benchmark-index
     - name: measured_search
-      runner: rally
-      config:
+      tool: rally
+      with:
         track: ./tracks/search
         challenge: default
 ```
 
-Allowed initial runners:
+Allowed initial phase tools:
 
 - `rally`
 - `espipe`
@@ -164,15 +181,14 @@ Allowed initial runners:
 
 Use `shell` and `python` only when the hypothesis genuinely needs arbitrary local logic.
 
-Every phase must have a `name`, `runner`, and `config` object. Runner-specific top-level shortcuts in Markdown are acceptable, but compile them into `config` in canonical YAML.
+Every phase must have a `name` and `tool`. Put tool-specific options under `with`.
 
 ## Isolation requirement
 
 Always consider whether variation state could leak. Default to reset between variations unless the user explicitly opts out.
 
 ```yaml
-isolation:
-  mode: reset_between_variations
+evaluation:
   reset:
     - delete_indices
     - clear_caches
@@ -195,7 +211,7 @@ generated/
   rally/
   scripts/
   metrics-plan.yml
-  runbook.md
+  evaluation-guide.md
 ```
 
 If creating Codex-ready repository content, use repo-scoped skills under `.agents/skills`.
@@ -205,21 +221,18 @@ When asked to define, package, or review a portable test hypothesis, use the blu
 `hypothetest.yml` must use this canonical top-level shape:
 
 ```yaml
-apiVersion: hypothetest.elastic/v1
-kind: BenchmarkScenario
-metadata: {}
-spec:
-  question: ""
-  deployment: {}
-  dataset: {}
-  setup: []
-  variations: {}
-  benchmark: {}
-  metrics: {}
-  diagnostics: {}
-  comparison: {}
-  report:
-    formats: [markdown, toon, charts]
+name: example
+owner: optional-owner
+question: ""
+hypothesis: ""
+deployment: {}
+dataset: {}
+variations: {}
+evaluation: {}
+measure: {}
+compare: {}
+report:
+  formats: [markdown, toon, charts]
 ```
 
 ## Metric plan
@@ -236,24 +249,25 @@ If a metric source is unclear, keep the metric but mark it as unresolved in `gen
 
 ## Diagnostics
 
-Use `esdiag` as the default Elasticsearch diagnostic collector. Scenario diagnostics are YAML configuration, not JSON. Allow each collection point to declare a specific API list:
+Use `esdiag` as the default Elasticsearch diagnostic collector. Scenario diagnostics are YAML configuration, not JSON. Allow each collection point to declare a specific API list under `measure.diagnostics`:
 
 ```yaml
-diagnostics:
-  collector: esdiag
-  results:
-    target: optional-results-cluster
-  collections:
-    before_phase:
-      apis:
-        - _cluster/health
-        - _nodes/stats
-        - _stats
-    after_phase:
-      apis:
-        - _nodes/stats
-        - _stats
-        - _cat/segments?format=json
+measure:
+  diagnostics:
+    tool: esdiag
+    results:
+      target: optional-results-cluster
+    at:
+      before_phase:
+        apis:
+          - _cluster/health
+          - _nodes/stats
+          - _stats
+      after_phase:
+        apis:
+          - _nodes/stats
+          - _stats
+          - _cat/segments?format=json
 ```
 
 The Architect should include these API lists in `generated/metrics-plan.yml` and ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.
@@ -265,15 +279,15 @@ Before finalizing a blueprint:
 - `hypothesis.md` follows the seven-step model: observation, question, hypothesis, variables, experiment design, measurement plan, interpretation.
 - Hypothesis has a clear question.
 - Hypothesis is falsifiable and has a predeclared decision rule.
-- Statistical plans declare the null hypothesis, alternative hypothesis, significance level, confidence level, test method, test direction, assumptions, and practical effect threshold when those are relevant.
+- Statistical plans declare the null hypothesis, alternative hypothesis, alpha, confidence, test method, test direction, assumptions, and practical effect threshold when those are relevant.
 - Multiple primary metrics or multiple candidates declare a multiple-comparison correction strategy or mark the comparison exploratory.
 - Deployment target is one of `compose`, `existing`, or `elastic-cloud`.
 - Dataset loader is `rally` or `espipe`.
 - At least two variations exist.
 - A baseline is named and exists in variations.
 - Each candidate exists in variations.
-- Each benchmark phase has a runner.
-- Each benchmark phase compiles to a `config` object.
+- Each benchmark phase has a tool.
+- Each benchmark phase places tool options under `with`.
 - Primary metrics are declared.
 - Metric sources are plausible.
 - Elasticsearch diagnostic metric sources use `esdiag` collections with explicit API lists.
@@ -283,10 +297,10 @@ Before finalizing a blueprint:
 - Snapshot/searchable snapshot hypotheses include filesystem repository configuration for local compose.
 - Reports include Markdown and TOON unless the user says otherwise.
 - Baseline and candidate names match variation keys exactly.
-- Variation setup is explicit and does not depend on previous variations unless isolation says so.
+- Variation setup is explicit and does not depend on previous variations unless `evaluation.reset` says shared state is intentional.
 - Interpretation limits identify the workload, dataset, deployment, and Elasticsearch version scope.
 
-When schema-validating generated YAML, use the Rust `yaml-schema` package installed with `cargo install yaml-schema`. The installed CLI is `ys`; validate manifests with `ys -f schemas/blueprint.schema.yaml <blueprint>/blueprint.yml` and scenarios with `ys -f schemas/hypothetest.schema.yaml <blueprint>/hypothetest.yml`. If `cargo` is unavailable, route the user to Coordinator setup before treating schema validation as complete.
+When schema-validating generated YAML, use the Rust `yaml-schema` package installed with `cargo install yaml-schema`. The installed CLI is `ys`; validate manifests with this skill's `schemas/blueprint.schema.yaml`. Validate `hypothetest.yml` with the Coordinator-owned `schemas/hypothetest.schema.yaml` when that skill is available. If `cargo` is unavailable, route the user to Coordinator setup before treating schema validation as complete.
 
 ## Architect output tone
 

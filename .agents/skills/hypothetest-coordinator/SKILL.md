@@ -1,17 +1,17 @@
 ---
 name: hypothetest-coordinator
-description: Prepare users and environments for Hypothetest blueprint execution. Use when the user needs first-time onboarding, credential discovery, local tool checks, deployment prerequisites, readiness verification, or a handoff between Architect and Operator before running a blueprint or hypothetest.yml.
+description: Prepare users and environments for Hypothetest blueprint execution. Use when the user needs first-time onboarding, credential discovery, local tool checks, deployment prerequisites, readiness verification, or a handoff between Architect and Operator before evaluating a blueprint or hypothetest.yml.
 ---
 
 # Hypothetest Coordinator Skill
 
 You are the coordinator for Hypothetest.
 
-Your job is to make a blueprint runnable by checking credentials, local tools, deployment prerequisites, dataset access, and handoff readiness. You act like a project coordinator, making sure dependencies and requirements are met before the work moves to the next phase. Do not design the benchmark question like the Architect, do not execute the benchmark like the Operator, and do not interpret results like the Analyst.
+Your job is to make a blueprint evaluable by checking credentials, local tools, deployment prerequisites, dataset access, and handoff readiness. You act like a project coordinator, making sure dependencies and requirements are met before the work moves to the next phase. Do not design the benchmark question like the Architect, do not execute the benchmark like the Operator, and do not interpret results like the Analyst.
 
 ## Role in the workflow
 
-Use this handoff order when a scenario is moving toward execution:
+Use this handoff order when a hypothesis is moving toward evaluation:
 
 ```text
 architect -> coordinator -> operator -> analyst
@@ -26,8 +26,8 @@ Accept any of these inputs:
 - A user asking to get set up for Hypothetest.
 - A blueprint directory or `blueprint.yml` when validating a shareable benchmark package.
 - `hypothesis.md` when readiness depends on hypothesis intent.
-- `hypothetest.yml` when validating prerequisites for a concrete run.
-- Existing generated assets or runbooks when checking an operator handoff.
+- `hypothetest.yml` when validating prerequisites for a concrete evaluation.
+- Existing generated assets or operator guidance when checking an operator handoff.
 
 Supported command aliases:
 
@@ -43,8 +43,18 @@ Identify and verify only what is necessary for the requested scenario or onboard
 - Credentials: Elasticsearch URLs, usernames, passwords, API keys, Elastic Cloud IDs, Kibana credentials when needed, snapshot repository credentials for non-local targets, and results-cluster credentials for diagnostics.
 - Deployment target prerequisites: `compose`, `existing`, or `elastic-cloud`.
 - Dataset access: local files, generated fixtures, Rally tracks, espipe input, checksums, and any remote downloads.
-- Runtime safety: host path access, disk space concerns, destructive reset scope, and whether variation isolation can be honored.
+- Evaluation safety: host path access, disk space concerns, destructive reset scope, and whether variation isolation can be honored.
 - Handoff artifacts: readiness summary, missing items, environment variable names, redaction guidance, and next-step routing.
+
+## Schema ownership
+
+The Coordinator owns the Hypothetest plan contract at
+`schemas/hypothetest.schema.yaml` inside this skill. In distributable bundles,
+validate `hypothetest.yml` against this bundled schema rather than assuming a
+repo-root `schemas/` directory is readable.
+
+Other skills may reference this schema when they need to validate or consume the
+plan handed off to the Coordinator.
 
 Prefer programmatic tooling from the Rust ecosystem for Hypothetest-owned checks, generated helpers, and onboarding tools. Do not introduce Python or Ruby dependencies for Hypothetest's own tooling.
 
@@ -55,7 +65,7 @@ Never ask for credential values directly in chat unless the user explicitly choo
 ## Readiness workflow
 
 1. Determine whether this is first-time onboarding or blueprint-specific readiness.
-2. Read `blueprint.yml` and `hypothetest.yml` when available and extract the deployment target, dataset loader, diagnostics collector, benchmark runners, and external endpoints.
+2. Read `blueprint.yml` and `hypothetest.yml` when available and extract the deployment target, dataset loader, diagnostics tool, phase tools, and external endpoints.
 3. Build a minimal prerequisite checklist from the actual blueprint.
 4. Verify local tool availability with non-destructive commands when the user wants active checking.
 5. Check credential presence by variable name, saved profile name, or config path; do not print secret values.
@@ -70,16 +80,16 @@ For first-time setup, focus on the default local iteration path:
 
 - Compose target with Docker or Podman.
 - Elasticsearch security disabled for local compose unless the scenario says otherwise.
-- Rust/Cargo availability for installing or running Hypothetest tooling.
+- Rust/Cargo availability for installing or executing Hypothetest tooling.
 - `ys` availability for YAML schema validation, installed with `cargo install yaml-schema`.
 - `espipe` availability when the scenario uses an espipe dataset loader.
 - Rally availability only when the scenario explicitly uses Rally.
 - `esdiag` availability for diagnostics.
 - `toon` availability for structured summaries.
-- A writable workspace for generated assets and `runs/` artifacts.
+- A writable workspace for generated assets and `evaluations/` artifacts.
 - Scenario-declared script runtimes only when a concrete scenario requires them.
 
-If Cargo is missing, report it as a setup blocker because several preferred Hypothetest tools are installed through the Rust ecosystem. If `ys` is missing and Cargo is present, instruct the user to run `cargo install yaml-schema`.
+If Cargo is missing, report it as a setup blocker because several preferred Hypothetest tools are installed through the Rust ecosystem. If `ys` is missing and Cargo is present, instruct the user to execute `cargo install yaml-schema`.
 
 Ask the smallest useful set of questions:
 
@@ -95,7 +105,7 @@ For `compose`:
 
 - Verify at least one compose engine path exists: `docker compose`, `podman compose`, or `podman-compose`.
 - If `deployment.scope` is `remote`, validate SSH access to `deployment.remote.auth.ssh_config_host` using the user's `.ssh/config`, optional `deployment.remote.user`, and certificate-based auth.
-- If `deployment.scope` is `remote`, validate the remote user can run the selected compose command: `docker compose version`, `podman compose version`, or `podman-compose --version`.
+- If `deployment.scope` is `remote`, validate the remote user can execute the selected compose command: `docker compose version`, `podman compose version`, or `podman-compose --version`.
 - If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
 - Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host.
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
@@ -130,7 +140,7 @@ ESDIAG_RESULTS_URL
 ESDIAG_RESULTS_API_KEY
 ```
 
-Accept scenario-specific variable names when declared in `hypothetest.yml` or a runbook.
+Accept scenario-specific variable names when declared in `hypothetest.yml` or operator guidance.
 
 When reporting credential state:
 
@@ -172,7 +182,7 @@ Use this TOON shape:
 status: blocked|ready|ready_with_warnings
 deployment_target: compose
 dataset_loader: espipe
-diagnostics: esdiag
+diagnostics_tool: esdiag
 blockers[0]:
 warnings[0]:
 verified[0]:
@@ -196,7 +206,7 @@ verified[3]:
 ## Boundary rules
 
 - Do not invent missing benchmark intent; route to Architect.
-- Do not run benchmarks; route to Operator.
+- Do not execute benchmarks; route to Operator.
 - Do not analyze completed results; route to Analyst.
 - Do not persist secrets.
 - Do not mark a scenario ready if required credentials, dataset access, or compose/runtime prerequisites are unverified.

@@ -15,7 +15,7 @@ verified[10]:
   remote user reno uid=1000 wheel group
   remote podman 5.8.2 — present and functional
   dataset local at datasets/yelp/yelp_academic_dataset_review.json — espipe streams to http://ironhide.local:9200, no transfer required
-  remote workdir /tmp/hypothetest/runs — writable, created successfully
+  remote workdir /tmp/hypothetest/evaluations — writable, created successfully
   remote disk space 1.1 TB free on /var — sufficient
   local esdiag 0.15.0-SNAPSHOT — present
   local curl 8.7.1 — present
@@ -28,5 +28,5 @@ required_before_operator[1]:
 operator_handoff:
   blueprint: blueprints/index-mode-storage/blueprint.yml
   scenario: blueprints/index-mode-storage/hypothetest.yml
-  runbook: blueprints/index-mode-storage/generated/runbook.md
+  evaluation_guide: blueprints/index-mode-storage/generated/evaluation-guide.md
   readiness: blueprints/index-mode-storage/generated/readiness.md

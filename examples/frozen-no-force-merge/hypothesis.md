@@ -16,6 +16,7 @@ How much slower is search on frozen when not force merging?
 Not force merging before mounting a searchable snapshot will increase p99 search latency and repository bytes read compared with a force-merged snapshot of the same dataset.
 
 ```yaml
+claim: not_force_merged increases p99 latency and repository bytes read compared with force_merged
 null: not_force_merged p99 latency and repository bytes read are not materially higher than force_merged
 alternative: not_force_merged p99 latency and repository bytes read are materially higher than force_merged
 tail: one_tailed
@@ -27,17 +28,9 @@ tail: one_tailed
 baseline: force_merged
 candidates:
   - not_force_merged
-independent:
+changed:
   - force_merge_before_snapshot
-dependent:
-  - search_latency_p50
-  - search_latency_p90
-  - search_latency_p99
-  - throughput
-  - repository_bytes_read
-  - searchable_snapshot_cache_hit_rate
-  - segment_count
-controlled:
+controls:
   - elasticsearch_version
   - heap_size
   - dataset
@@ -69,7 +62,7 @@ dataset:
   input: ./data/http_logs.ndjson
   target: logs-benchmark-default
   index_template: ./templates/logs.json
-  default_settings:
+  settings:
     number_of_shards: 1
     number_of_replicas: 0
 variations:
@@ -90,33 +83,31 @@ variations:
         snapshot: logs-not-force-merged
       - type: mount_searchable_snapshot
         tier: frozen
-benchmark:
+evaluation:
   repeats: 3
-  randomize_variation_order: true
-  phases:
-    - name: cold_search
-      runner: rally
-      config:
-        track: ./tracks/frozen-search
-        challenge: cold-cache
-    - name: warm_search
-      runner: rally
-      config:
-        track: ./tracks/frozen-search
-        challenge: warm-cache
-isolation:
-  mode: reset_between_variations
+  order: randomized
   reset:
     - delete_indices
     - clear_caches
     - reload_dataset
     - verify_cluster_green
+  phases:
+    - name: cold_search
+      tool: rally
+      with:
+        track: ./tracks/frozen-search
+        challenge: cold-cache
+    - name: warm_search
+      tool: rally
+      with:
+        track: ./tracks/frozen-search
+        challenge: warm-cache
 ```
 
 # 6. Measurement Plan
 
 ```yaml
-metrics:
+measure:
   primary:
     - search_latency_p50
     - search_latency_p90
@@ -131,36 +122,41 @@ metrics:
     - gc_time
     - disk_read_bytes
     - disk_write_bytes
-diagnostics:
-  collector: esdiag
-  collections:
-    after_phase:
-      apis:
-        - _nodes/stats
-        - _stats
-        - _cat/segments?format=json
-comparison:
+  diagnostics:
+    tool: esdiag
+    at:
+      after_phase:
+        apis:
+          - _nodes/stats
+          - _stats
+          - _cat/segments?format=json
+compare:
   baseline: force_merged
   candidates:
     - not_force_merged
-  dimensions:
-    - variation
-    - phase
-    - query_name
-    - repeat
-  statistical_plan:
-    test: bootstrap
+  changed:
+    - force_merge_before_snapshot
+  controls:
+    - elasticsearch_version
+    - heap_size
+    - dataset
+    - query_mix
+    - shard_count
+    - replica_count
+    - snapshot_repository
+  analysis:
+    method: bootstrap
     tail: one_tailed
-    significance_level: 0.05
-    confidence_level: 0.95
-    minimum_effect_size:
+    alpha: 0.05
+    confidence: 0.95
+    effect:
       search_latency_p99: 10%
       repository_bytes_read: 10%
     assumptions:
       - reset_between_variations makes repeats independent enough for exploratory comparison
       - latency and repository-read distributions may be skewed
-    multiple_comparison_correction: false
-  decision_rule: Reject the hypothesis only if not_force_merged p99 latency and repository bytes read are not materially higher than force_merged across measured search phases.
+    multiple_comparisons: false
+  decision: Reject the hypothesis only if not_force_merged p99 latency and repository bytes read are not materially higher than force_merged across measured search phases.
 ```
 
 # 7. Interpretation
