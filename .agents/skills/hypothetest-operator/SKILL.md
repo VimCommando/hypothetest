@@ -37,6 +37,7 @@ hypothetest.yml
 
 Before generating or running anything, validate that:
 
+- YAML schema validation succeeds with `ys`, installed via `cargo install yaml-schema`; if `cargo` or `ys` is unavailable, route to Coordinator setup.
 - `apiVersion` is `hypothetest.elastic/v1`.
 - `kind` is `BenchmarkScenario`.
 - `spec.deployment.target` is supported.

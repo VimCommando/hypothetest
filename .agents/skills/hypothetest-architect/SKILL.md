@@ -286,6 +286,8 @@ Before finalizing a blueprint:
 - Variation setup is explicit and does not depend on previous variations unless isolation says so.
 - Interpretation limits identify the workload, dataset, deployment, and Elasticsearch version scope.
 
+When schema-validating generated YAML, use the Rust `yaml-schema` package installed with `cargo install yaml-schema`. The installed CLI is `ys`; validate manifests with `ys -f schemas/blueprint.schema.yaml <blueprint>/blueprint.yml` and scenarios with `ys -f schemas/hypothetest.schema.yaml <blueprint>/hypothetest.yml`. If `cargo` is unavailable, route the user to Coordinator setup before treating schema validation as complete.
+
 ## Architect output tone
 
 Return concrete files or patches when possible. Avoid abstract brainstorming once enough information exists. If information is missing, ask for the smallest number of decisions needed to make progress.

@@ -71,12 +71,15 @@ For first-time setup, focus on the default local iteration path:
 - Compose target with Docker or Podman.
 - Elasticsearch security disabled for local compose unless the scenario says otherwise.
 - Rust/Cargo availability for installing or running Hypothetest tooling.
+- `ys` availability for YAML schema validation, installed with `cargo install yaml-schema`.
 - `espipe` availability when the scenario uses an espipe dataset loader.
 - Rally availability only when the scenario explicitly uses Rally.
 - `esdiag` availability for diagnostics.
 - `toon` availability for structured summaries.
 - A writable workspace for generated assets and `runs/` artifacts.
 - Scenario-declared script runtimes only when a concrete scenario requires them.
+
+If Cargo is missing, report it as a setup blocker because several preferred Hypothetest tools are installed through the Rust ecosystem. If `ys` is missing and Cargo is present, instruct the user to run `cargo install yaml-schema`.
 
 Ask the smallest useful set of questions:
 

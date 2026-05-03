@@ -85,6 +85,21 @@ Runtime outputs may include `runs/`, `manifest.toon`, `summary.toon`, `compariso
 
 `blueprint.yml` is the machine-readable manifest for the zip contents and validates against `schemas/blueprint.schema.yaml`.
 
+## Tooling
+
+Hypothetest tooling prefers the Rust ecosystem. Install Rust/Cargo before setup, then install the YAML schema validator with:
+
+```bash
+cargo install yaml-schema
+```
+
+The package installs the `ys` executable. Use it for schema validation:
+
+```bash
+ys -f schemas/blueprint.schema.yaml <blueprint>/blueprint.yml
+ys -f schemas/hypothetest.schema.yaml <blueprint>/hypothetest.yml
+```
+
 Install as repo-scoped skills by copying `.agents/skills` into the root of your target repository.
 
 ```bash

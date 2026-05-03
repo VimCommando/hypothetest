@@ -360,7 +360,7 @@ $defs:
           - type: object
             additionalProperties: false
             required:
-              - null
+              - "null"
               - alternative
             properties:
               "null":
