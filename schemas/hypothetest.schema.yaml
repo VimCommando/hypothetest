@@ -7,6 +7,7 @@ required:
   - name
   - question
   - hypothesis
+  - experiment
   - deployment
   - dataset
   - variations
@@ -28,6 +29,8 @@ properties:
     minLength: 1
   hypothesis:
     $ref: "#/$defs/hypothesis"
+  experiment:
+    $ref: "#/$defs/experiment"
   deployment:
     $ref: "#/$defs/deployment"
   dataset:
@@ -74,6 +77,52 @@ $defs:
             enum:
               - one_tailed
               - two_tailed
+
+  experiment:
+    type: object
+    additionalProperties: false
+    required:
+      - intent
+      - constants
+      - variables
+    properties:
+      intent:
+        type: string
+        minLength: 1
+        pattern: ^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$
+        examples:
+          - compare_deployments
+          - compare_data_configuration
+          - compare_cluster_configuration
+          - measure_ingest_throughput
+          - validate_configuration_compatibility
+      constants:
+        type: object
+        additionalProperties: false
+        properties:
+          required:
+            type: array
+            default: []
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/factor"
+          best_effort:
+            type: array
+            default: []
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/factor"
+      variables:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/factor"
+
+  factor:
+    type: string
+    minLength: 1
+    pattern: ^[A-Za-z0-9][A-Za-z0-9_.-]*$
 
   deployment:
     type: object

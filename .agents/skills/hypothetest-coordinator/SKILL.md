@@ -42,7 +42,7 @@ Identify and verify only what is necessary for the requested scenario or onboard
 - Local tools: Docker, Podman, compose support, Rust/Cargo, Hypothetest-compatible Rust binaries, curl, jq, toon, repo-local Rust tooling, and any scenario-declared script interpreters.
 - Credentials: Elasticsearch URLs, usernames, passwords, API keys, Elastic Cloud IDs, Kibana credentials when needed, snapshot repository credentials for non-local targets, and results-cluster credentials for diagnostics.
 - Deployment target prerequisites: `compose`, `existing`, or `elastic-cloud`.
-- Dataset access: local files, generated fixtures, Rally tracks, espipe input, checksums, and any remote downloads.
+- Dataset access: loader-local files, generated fixtures, Rally tracks, espipe input, checksums, and any explicit remote downloads.
 - Evaluation safety: host path access, disk space concerns, destructive reset scope, and whether variation isolation can be honored.
 - Handoff artifacts: readiness summary, missing items, environment variable names, redaction guidance, and next-step routing.
 
@@ -65,7 +65,7 @@ Never ask for credential values directly in chat unless the user explicitly choo
 ## Readiness workflow
 
 1. Determine whether this is first-time onboarding or blueprint-specific readiness.
-2. Read `blueprint.yml` and `hypothetest.yml` when available and extract the deployment target, dataset loader, diagnostics tool, phase tools, and external endpoints.
+2. Read `blueprint.yml` and `hypothetest.yml` when available and extract the experiment intent, constants, variables, deployment target, dataset loader, diagnostics tool, phase tools, and external endpoints.
 3. Build a minimal prerequisite checklist from the actual blueprint.
 4. Verify local tool availability with non-destructive commands when the user wants active checking.
 5. Check credential presence by variable name, saved profile name, or config path; do not print secret values.
@@ -73,6 +73,17 @@ Never ask for credential values directly in chat unless the user explicitly choo
 7. Produce a readiness artifact or concise handoff summary for the Operator.
 
 If required blueprint or scenario intent is missing, route back to the Architect. If all prerequisites are satisfied and the user wants execution, route to the Operator.
+
+## Experiment-shape readiness
+
+Use `experiment` to decide what readiness means:
+
+- `experiment.intent` states what the user is trying to learn.
+- `experiment.variables` names factors intentionally changed by the evaluation.
+- `experiment.constants.required` names controls that must match exactly; if a required constant cannot be matched across declared variations, mark readiness `blocked` and route back to the Architect.
+- `experiment.constants.best_effort` names controls that should be matched as closely as the target allows; if a best-effort constant cannot be matched exactly, mark readiness `ready_with_warnings` and require the Operator to record the resolved behavior.
+
+If `deployment` appears in `experiment.variables`, verify prerequisites for every declared deployment target or candidate deployment. If `deployment` appears in `experiment.constants.required`, verify the deployment target is singular and can be reused consistently across variations. If a factor appears in both constants and variables, treat the plan as invalid and route back to the Architect.
 
 ## First-time onboarding
 
@@ -107,6 +118,8 @@ For `compose`:
 - If `deployment.scope` is `remote`, validate SSH access to `deployment.remote.auth.ssh_config_host` using the user's `.ssh/config`, optional `deployment.remote.user`, and certificate-based auth.
 - If `deployment.scope` is `remote`, validate the remote user can execute the selected compose command: `docker compose version`, `podman compose version`, or `podman-compose --version`.
 - If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
+- If `deployment.scope` is `remote`, do not require raw dataset files to exist on the SSH host. Verify dataset access where the declared loader will run. The SSH host normally receives compose assets and runtime support files only; raw data reaches Elasticsearch through `espipe`, Rally/esrally, or another declared indexing phase.
+- If the scenario explicitly declares remote data generation, remote downloads, or a remote-local script phase, verify only those remote data prerequisites.
 - Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host.
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
 - Confirm generated volume and repository paths are repo-local or clearly declared.
@@ -186,6 +199,11 @@ diagnostics_tool: esdiag
 blockers[0]:
 warnings[0]:
 verified[0]:
+experiment:
+  intent: compare_deployments
+  variables[1]: deployment
+  constants_required[2]: dataset,workload
+  constants_best_effort[1]: index.primary_shards
 credential_requirements[1]{name,status,required_for}:
   ELASTICSEARCH_URL,missing,existing deployment
 operator_handoff:
@@ -202,6 +220,8 @@ verified[3]:
   remote docker compose version
   remote workdir writable
 ```
+
+For remote compose with loader-local data, include a warning or verified note that the raw dataset is loaded through the indexing tool and is not staged to the SSH host.
 
 ## Boundary rules
 

@@ -12,6 +12,19 @@ hypothesis:
   null: string
   alternative: string
   tail: one_tailed
+experiment:
+  intent: compare_deployments
+  constants:
+    required:
+      - dataset
+      - workload
+      - primary_metrics
+      - decision_rule
+    best_effort:
+      - index.primary_shards
+      - cluster.topology
+  variables:
+    - deployment
 deployment:
   target: compose
   engine: auto
@@ -62,9 +75,18 @@ report:
   limits: string
 ```
 
-Use `changed` only for the main factors under test. Use `controls` for
-conditions the user intends to hold constant. The measured values already live
-under `measure`, so do not duplicate them as dependent variables.
+Use `experiment.intent` for what the user is trying to learn. Use
+`experiment.variables` only for factors intentionally changed by the experiment.
+Use `experiment.constants.required` for controls that must match exactly, and
+`experiment.constants.best_effort` for controls that should be matched as
+closely as the target allows. Do not put the same factor in constants and
+variables.
+
+Keep `compare.changed` and `compare.controls` empty unless backward
+compatibility or a downstream consumer still requires them. New plans should use
+`experiment.variables` and `experiment.constants` as the source of truth. The
+measured values already live under `measure`, so do not duplicate them as
+dependent variables.
 
 Plan vocabulary is imperative: `evaluation` says how to execute, `measure` says
 what to collect, and `compare` says how to decide. Evaluation output vocabulary

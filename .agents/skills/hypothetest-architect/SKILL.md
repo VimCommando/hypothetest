@@ -30,7 +30,7 @@ Supported command aliases:
 
 ## Modes
 
-Use `consult` mode when no hypothesis is provided. Ask only for the missing decisions needed to produce a useful first `hypothesis.md`: observation, benchmark question, falsifiable hypothesis, deployment target, dataset loader and source, baseline and candidate variations, benchmark phases, primary metrics, decision rule, and interpretation limits.
+Use `consult` mode when no hypothesis is provided. Ask only for the missing decisions needed to produce a useful first `hypothesis.md`: observation, benchmark question, falsifiable hypothesis, experiment intent, constants, variables, deployment target, dataset loader and source, baseline and candidate variations, benchmark phases, primary metrics, decision rule, and interpretation limits.
 
 Use `compile` mode when a hypothesis is provided. Parse the Markdown front matter and required seven sections, then emit canonical `hypothetest.yml` plus generated assets. Configurations must be YAML/YML, not JSON. Do not silently drop user-provided fields; preserve unknown but well-scoped extension fields under the closest relevant object.
 
@@ -50,14 +50,18 @@ use the Coordinator-owned schema to validate generated `hypothetest.yml`.
 A complete hypothesis needs:
 
 1. Observation, benchmark question, and falsifiable hypothesis. Prefer explicit null and alternative hypotheses.
-2. Deployment target. Default to `compose`.
-3. Dataset loader and source. Initial loaders: `rally` and `espipe`.
-4. At least two configuration variations.
-5. Benchmark phases or workload definition.
-6. Primary metrics to collect and compare.
-7. Baseline and candidate variation names.
-8. Diagnostic API collection points when Elasticsearch metrics are required.
-9. Predeclared decision rule, statistical plan when inference is used, and interpretation limits.
+2. Experiment intent, using `<verb>_<subject>[_<qualifier>]` names such as `compare_deployments`, `compare_data_configuration`, `compare_cluster_configuration`, `measure_ingest_throughput`, or `validate_configuration_compatibility`.
+3. Constants and variables. Ask what must stay constant, what is deliberately varied, and which constants are exact requirements versus best-effort controls.
+4. Deployment target. Default to `compose`.
+5. Dataset loader and source. Initial loaders: `rally` and `espipe`.
+6. At least two configuration variations.
+7. Benchmark phases or workload definition.
+8. Primary metrics to collect and compare.
+9. Baseline and candidate variation names.
+10. Diagnostic API collection points when Elasticsearch metrics are required.
+11. Predeclared decision rule, statistical plan when inference is used, and interpretation limits.
+
+Use `experiment.constants.required` for controls that must match exactly or make the blueprint invalid. Use `experiment.constants.best_effort` for controls the user wants held as closely as the target allows; these must be recorded and reported when a deployment cannot expose an exact equivalent. Use `experiment.variables` only for factors intentionally changed by the experiment. Do not put the same factor in constants and variables.
 
 If any required intent is missing in compile mode, fail with a short error list and the exact section that needs to be fixed. Do not invent missing scientific intent.
 
@@ -115,6 +119,8 @@ deployment:
 
 For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to execute the selected compose engine before Operator execution.
 
+Remote compose SSH controls the deployment host only. Do not imply that raw dataset files are copied to `deployment.remote.workdir`. Dataset ingestion still happens through the declared loader, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the deployment. Only generated compose assets, operator scripts, runtime manifests, and deployment support files belong on the remote SSH host unless the blueprint explicitly declares a remote-generated fixture or remote-local phase script.
+
 ## Dataset loaders
 
 Support both first-class loaders:
@@ -138,6 +144,8 @@ dataset:
 ```
 
 Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
+
+Dataset locality is defined by the loader, not by the deployment SSH target. For remote compose, local input files, Rally tracks, and espipe inputs remain on the machine running the loader unless the dataset explicitly declares that the Operator must generate the data on the remote host. The SSH host does not receive a copy of raw corpus files as part of normal remote deployment setup.
 
 Dataset fixtures in portable blueprints use one object shape:
 
@@ -225,6 +233,7 @@ name: example
 owner: optional-owner
 question: ""
 hypothesis: ""
+experiment: {}
 deployment: {}
 dataset: {}
 variations: {}
@@ -279,6 +288,11 @@ Before finalizing a blueprint:
 - `hypothesis.md` follows the seven-step model: observation, question, hypothesis, variables, experiment design, measurement plan, interpretation.
 - Hypothesis has a clear question.
 - Hypothesis is falsifiable and has a predeclared decision rule.
+- Experiment intent is declared with a clear action-oriented name.
+- Experiment constants and variables are declared.
+- No factor appears in both `experiment.constants.required` or `experiment.constants.best_effort` and `experiment.variables`.
+- `experiment.constants.required` contains only controls that can be matched exactly across the declared variations.
+- `experiment.constants.best_effort` identifies controls that may be platform-managed or not directly configurable, and interpretation limits explain their impact.
 - Statistical plans declare the null hypothesis, alternative hypothesis, alpha, confidence, test method, test direction, assumptions, and practical effect threshold when those are relevant.
 - Multiple primary metrics or multiple candidates declare a multiple-comparison correction strategy or mark the comparison exploratory.
 - Deployment target is one of `compose`, `existing`, or `elastic-cloud`.

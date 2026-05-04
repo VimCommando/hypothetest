@@ -52,6 +52,8 @@ Before generating or executing anything, validate that:
 - `deployment.target` is supported.
 - `dataset.loader` is `rally` or `espipe`.
 - `variations` contains at least two entries.
+- `experiment.intent`, `experiment.constants`, and `experiment.variables` are declared.
+- no factor appears in both `experiment.constants.required` or `experiment.constants.best_effort` and `experiment.variables`.
 - `compare.baseline` and every candidate exist in `variations`.
 - every evaluation phase has `name` and `tool`.
 - every `shell` or `python` phase uses an allowlisted repo-local path.
@@ -103,6 +105,8 @@ For `scope: remote`, require Coordinator readiness evidence before execution. Th
 
 Execute compose operations on the remote host in the declared `deployment.remote.workdir`. Do not attempt remote execution when SSH access or compose permissions are unverified.
 
+For remote compose, treat SSH as the deployment control plane, not the dataset transport. Do not copy raw corpus files to `deployment.remote.workdir` by default. Load data through the declared indexing/workload tool, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the remote deployment. Only stage raw data on the remote host when the blueprint explicitly declares remote data generation, a remote download, or a remote-local phase script.
+
 ## Compose generated assets
 
 Generate or maintain:
@@ -137,6 +141,10 @@ for repeat in repeats:
 
 A variation must not inherit experimental state from another variation unless the scenario explicitly says so.
 
+`load_dataset` means invoking the declared loader from its configured execution location. For remote compose, this usually means the Operator runs the loader from the coordinator/operator machine using loader-local input files and sends documents to the remote Elasticsearch endpoint. It does not mean copying the raw dataset to the SSH host.
+
+Honor `experiment.constants` when provisioning and executing variations. Required constants must remain unchanged across variations; if execution discovers that a required constant cannot be held, stop and preserve partial artifacts. Best-effort constants should be applied when the target supports them; when the target manages or approximates them, record the resolved behavior in the evaluation manifest and report inputs.
+
 Default reset behavior is:
 
 ```yaml
@@ -159,6 +167,12 @@ Blueprint datasets may declare `path` for included or pre-existing data, or
 `generated_by` for data the Operator must generate during execution. Record
 generator command, parameters, output target, and observed size/document count
 in the evaluation manifest.
+
+Dataset paths are loader-local unless the dataset or phase explicitly says
+otherwise. For remote compose, keep included datasets, Rally tracks, and espipe
+inputs on the machine that runs the loader. The remote SSH host only needs the
+compose deployment assets and runtime support files unless a remote-local data
+source is explicitly declared.
 
 ### Rally
 
@@ -257,7 +271,11 @@ completed_at: null
 deployment_target: compose
 engine: docker
 elasticsearch_version: version
+experiment_intent: compare_deployments
 variations[0]:
+variables[1]: deployment
+constants_required[2]: dataset,workload
+constants_best_effort[1]: index.primary_shards
 repeats: 3
 artifacts[0]:
 ```

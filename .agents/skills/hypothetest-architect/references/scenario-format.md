@@ -43,16 +43,21 @@ tail: two_tailed
 # 4. Variables
 
 ```yaml
+intent: compare_cluster_configuration
 baseline: baseline
 candidates:
   - candidate
-changed:
+constants:
+  required:
+    - deployment
+    - elasticsearch_version
+    - dataset
+    - workload
+    - primary_metrics
+    - decision_rule
+  best_effort: []
+variables:
   - setting_under_test
-controls:
-  - elasticsearch_version
-  - heap_size
-  - dataset
-  - query_mix
 ```
 
 # 5. Experiment Design
@@ -108,12 +113,6 @@ compare:
   baseline: baseline
   candidates:
     - candidate
-  changed:
-    - setting_under_test
-  controls:
-    - elasticsearch_version
-    - heap_size
-    - dataset
   analysis:
     method: bootstrap
     tail: two_tailed
@@ -136,7 +135,7 @@ How should results be interpreted, including acceptance, rejection, limits, and 
 - Front matter becomes top-level `name`, `owner`, `description`, and `version`.
 - `# 2. Question` becomes top-level `question`.
 - `# 3. Hypothesis` becomes top-level `hypothesis`.
-- `# 4. Variables` validates `compare.baseline`, `compare.candidates`, `compare.changed`, and `compare.controls`.
+- `# 4. Variables` becomes top-level `experiment` and validates `compare.baseline` and `compare.candidates`.
 - `# 5. Experiment Design` provides `deployment`, `dataset`, `variations`, and `evaluation`.
 - `# 6. Measurement Plan` provides `measure` and `compare`.
 - `# 7. Interpretation` becomes `report.limits` and must preserve applicability limits.
@@ -147,8 +146,12 @@ How should results be interpreted, including acceptance, rejection, limits, and 
 - Prefer explicit null and alternative hypotheses. The null hypothesis is the default assumption to reject or fail to reject; the alternative is the claim being evaluated.
 - A baseline variation must be named and must exist.
 - Each candidate variation must be named and must exist.
-- `changed` should name only the factors intentionally varied between baseline and candidates.
-- `controls` should either appear in deployment, dataset, variation, or evaluation configuration, or be called out as assumptions.
+- `intent` should use an action-oriented `<verb>_<subject>[_<qualifier>]` name, such as `compare_deployments`, `compare_data_configuration`, `compare_cluster_configuration`, `measure_ingest_throughput`, or `validate_configuration_compatibility`.
+- `variables` should name only factors intentionally varied between baseline and candidates.
+- `constants.required` should name controls that must match exactly or invalidate the blueprint.
+- `constants.best_effort` should name controls that should be matched as closely as the target allows and reported as interpretation limits when an exact match is impossible.
+- No factor may appear in both `constants.required` or `constants.best_effort` and `variables`.
+- Constants should either appear in deployment, dataset, variation, or evaluation configuration, or be called out as assumptions.
 - Benchmark phases must have `name` and `tool`; tool-specific options live under `with`.
 - Repeats must be declared. Prefer at least three repeats for exploratory evaluations and more for noisy measurements.
 - Variation order should be randomized unless the hypothesis gives a reason not to.
@@ -205,17 +208,21 @@ tail: one_tailed
 # 4. Variables
 
 ```yaml
+intent: compare_cluster_configuration
 baseline: local_warm
 candidates:
   - searchable_snapshot
-changed:
+constants:
+  required:
+    - deployment
+    - elasticsearch_version
+    - heap_size
+    - dataset
+    - query_mix
+  best_effort:
+    - shard_count
+variables:
   - storage_mode
-controls:
-  - elasticsearch_version
-  - heap_size
-  - dataset
-  - query_mix
-  - shard_count
 ```
 
 # 5. Experiment Design
@@ -275,13 +282,6 @@ compare:
   baseline: local_warm
   candidates:
     - searchable_snapshot
-  changed:
-    - storage_mode
-  controls:
-    - elasticsearch_version
-    - heap_size
-    - dataset
-    - query_mix
   analysis:
     method: bootstrap
     tail: one_tailed

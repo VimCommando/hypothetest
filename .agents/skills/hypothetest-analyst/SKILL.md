@@ -53,13 +53,14 @@ Write outputs into the evaluation directory unless the user explicitly requests 
 ## Analysis workflow
 
 1. Load `evaluation.yml`, `manifest.toon`, and the canonical plan.
-2. Identify baseline and candidate variations.
+2. Identify the experiment intent, constants, variables, baseline, and candidate variations.
 3. Verify all expected variations, repeats, and phases completed.
-4. Normalize metrics into a comparison table.
-5. Compare primary metrics first.
-6. Analyze secondary metrics only to explain or qualify primary findings.
-7. Identify outliers, failed phases, missing data, and state leakage risks.
-8. Write a clear finding with caveats.
+4. Check whether required constants were preserved and whether best-effort constants were approximated or platform-managed.
+5. Normalize metrics into a comparison table.
+6. Compare primary metrics first.
+7. Analyze secondary metrics only to explain or qualify primary findings.
+8. Identify outliers, failed phases, missing data, state leakage risks, and unresolved best-effort constants.
+9. Write a clear finding with caveats.
 
 If the evaluation is partial, analyze completed data but lead with missing or failed phases. Do not hide failed repeats in averages.
 
@@ -69,6 +70,8 @@ If the evaluation is partial, analyze completed data but lead with missing or fa
 # Result
 
 # What was compared
+
+# Constants and variables
 
 # Evaluation quality
 
@@ -102,6 +105,16 @@ This evaluation used the `compose` deployment target. Results are useful for val
 Use the scenario's declared comparison:
 
 ```yaml
+experiment:
+  intent: compare_deployments
+  constants:
+    required:
+      - dataset
+      - workload
+    best_effort:
+      - index.primary_shards
+  variables:
+    - deployment
 compare:
   baseline: baseline_name
   candidates:
@@ -175,6 +188,9 @@ metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
 ## Interpretation guidance
 
 - Keep the main result tied to the user's original question.
+- Report `experiment.intent`, `experiment.variables`, `experiment.constants.required`, and `experiment.constants.best_effort` explicitly.
+- Treat required-constant mismatches as a serious validity issue.
+- Treat best-effort constants that were approximated or platform-managed as interpretation limits, not hidden implementation details.
 - Separate cold-cache and warm-cache results when available.
 - For force-merge tests, focus on duration, disk writes, merge time, final segment count, and resulting store size.
 - For frozen/searchable snapshot tests, focus on search latency, throughput, repository reads, cache behavior, and segment count.

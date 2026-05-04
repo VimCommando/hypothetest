@@ -78,6 +78,8 @@ $defs:
       deployment:
         type: object
         additionalProperties: true
+      experiment:
+        $ref: "#/$defs/experiment"
       variations:
         type: array
         default: []
@@ -97,6 +99,46 @@ $defs:
           - environment-dependent
           - benchmark-grade
           - incomplete
+
+  experiment:
+    type: object
+    additionalProperties: false
+    required:
+      - intent
+      - constants
+      - variables
+    properties:
+      intent:
+        type: string
+        minLength: 1
+        pattern: ^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$
+      constants:
+        type: object
+        additionalProperties: false
+        properties:
+          required:
+            type: array
+            default: []
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/factor"
+          best_effort:
+            type: array
+            default: []
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/factor"
+      variables:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/factor"
+
+  factor:
+    type: string
+    minLength: 1
+    pattern: ^[A-Za-z0-9][A-Za-z0-9_.-]*$
 
   evidence:
     type: object

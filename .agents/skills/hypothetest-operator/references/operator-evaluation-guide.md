@@ -8,7 +8,7 @@
 6. Wait for cluster readiness.
 7. For each variation and repeat:
    - reset state
-   - load dataset
+   - load dataset through the declared indexing/workload tool
    - apply variation setup
    - execute evaluation phases
    - collect diagnostics with `esdiag` using the YAML-defined API list for each collection point
@@ -16,3 +16,8 @@
    - archive artifacts
 8. Stop or preserve deployment according to scenario cleanup policy.
 9. Write evaluation manifest.
+
+For remote compose, SSH manages the deployment host only. Do not stage raw
+dataset files to the SSH host by default. `espipe`, Rally/esrally, or another declared
+loader sends data to the Elasticsearch endpoint exposed by the deployment from
+the loader's configured execution location.
