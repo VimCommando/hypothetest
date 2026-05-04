@@ -56,11 +56,12 @@ Write outputs into the evaluation directory unless the user explicitly requests 
 2. Identify the experiment intent, constants, variables, baseline, and candidate variations.
 3. Verify all expected variations, repeats, and phases completed.
 4. Check whether required constants were preserved and whether best-effort constants were approximated or platform-managed.
-5. Normalize metrics into a comparison table.
-6. Compare primary metrics first.
-7. Analyze secondary metrics only to explain or qualify primary findings.
-8. Identify outliers, failed phases, missing data, state leakage risks, and unresolved best-effort constants.
-9. Write a clear finding with caveats.
+5. Extract total evaluation runtime and per-variation runtimes from `evaluation.yml` or `manifest.toon`.
+6. Normalize metrics into a comparison table.
+7. Compare primary metrics first.
+8. Analyze secondary metrics only to explain or qualify primary findings.
+9. Identify outliers, failed phases, missing data, state leakage risks, runtime anomalies, and unresolved best-effort constants.
+10. Write a clear finding with caveats.
 
 If the evaluation is partial, analyze completed data but lead with missing or failed phases. Do not hide failed repeats in averages.
 
@@ -74,6 +75,8 @@ If the evaluation is partial, analyze completed data but lead with missing or fa
 # Constants and variables
 
 # Evaluation quality
+
+# Runtime
 
 # Primary metrics
 
@@ -159,8 +162,13 @@ Confidence is not statistical significance. Treat it as a plain-language quality
 scenario: name
 deployment_target: compose
 result_quality: development-grade
+runtime_total_seconds: 360.5
+runtime_total_human: 6m 0.5s
 baseline: baseline
 candidates[1]: candidate
+variation_runtime[2]{variation,repeat,seconds,human,status}:
+  baseline,1,120.0,2m 0s,complete
+  candidate,1,240.5,4m 0.5s,complete
 primary_findings[1]{metric,baseline,candidate,delta_absolute,delta_percent,direction,confidence}:
   search_latency_p99,100,150,50,50,candidate_higher,medium
 caveats[0]:
@@ -189,6 +197,7 @@ metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
 
 - Keep the main result tied to the user's original question.
 - Report `experiment.intent`, `experiment.variables`, `experiment.constants.required`, and `experiment.constants.best_effort` explicitly.
+- Report total evaluation runtime and each variation's runtime in the summary. If runtime is missing, call it out as an evaluation quality gap.
 - Treat required-constant mismatches as a serious validity issue.
 - Treat best-effort constants that were approximated or platform-managed as interpretation limits, not hidden implementation details.
 - Separate cold-cache and warm-cache results when available.

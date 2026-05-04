@@ -14,6 +14,13 @@ One-paragraph answer to the scenario question.
 
 Deployment target, result quality, failures, missing metrics, isolation notes.
 
+# Runtime
+
+Total evaluation runtime and per-variation runtime.
+
+| Variation | Repeat | Runtime | Status |
+|---|---:|---:|---|
+
 # Primary metrics
 
 | Metric | Baseline | Candidate | Delta | Delta % | Confidence |

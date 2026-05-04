@@ -133,6 +133,7 @@ Use this loop unless the scenario explicitly opts out:
 ```text
 for repeat in repeats:
   for variation in randomized_or_declared_order:
+    record_variation_started_at
     provision_or_reset_deployment
     wait_for_cluster_ready
     load_dataset
@@ -140,6 +141,7 @@ for repeat in repeats:
     execute_evaluation_phases
     collect_metrics
     archive_artifacts
+    record_variation_completed_at_and_runtime
 ```
 
 A variation must not inherit experimental state from another variation unless the scenario explicitly says so.
@@ -267,12 +269,16 @@ evaluation. It must validate against this skill's bundled
 to the preserved evidence, measurements, comparisons, report, summary, and
 charts.
 
+Record runtime explicitly. `manifest.runtime.total_seconds` is the elapsed wall-clock time from evaluation start to evaluation completion or failure. `manifest.runtime.variations` records each variation's elapsed wall-clock runtime, including repeat number when repeats are used. Compute variation runtime from the start of that variation's reset/provisioning through artifact archival for that variation/repeat, so loading, setup, phases, diagnostics, and archive cost are included.
+
 Also create `manifest.toon` as the compact runtime manifest with:
 
 ```toon
 scenario: name
 started_at: ISO-8601
 completed_at: null
+runtime_total_seconds: 0
+runtime_total_human: 0s
 deployment_target: compose
 engine: docker
 elasticsearch_version: version
@@ -282,6 +288,8 @@ variables[1]: deployment
 constants_required[2]: dataset,workload
 constants_best_effort[1]: index.primary_shards
 repeats: 3
+variation_runtime[1]{variation,repeat,seconds,human,status}:
+  baseline,1,120.5,2m 0.5s,complete
 artifacts[0]:
 ```
 
@@ -293,6 +301,8 @@ Also include:
 - `phase_statuses`
 - `failures`
 - `commands`
+- `runtime.total_seconds`
+- `runtime.variations`
 - `result_quality`
 
 ## Failure behavior

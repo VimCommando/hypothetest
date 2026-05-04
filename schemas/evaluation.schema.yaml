@@ -62,6 +62,8 @@ $defs:
         type:
           - string
           - "null"
+      runtime:
+        $ref: "#/$defs/runtime"
       status:
         enum:
           - complete
@@ -99,6 +101,54 @@ $defs:
           - environment-dependent
           - benchmark-grade
           - incomplete
+
+  runtime:
+    type: object
+    additionalProperties: false
+    required:
+      - total_seconds
+      - variations
+    properties:
+      total_seconds:
+        type: number
+        minimum: 0
+      total_human:
+        type: string
+      variations:
+        type: array
+        default: []
+        items:
+          $ref: "#/$defs/variation_runtime"
+
+  variation_runtime:
+    type: object
+    additionalProperties: false
+    required:
+      - variation
+      - seconds
+    properties:
+      variation:
+        type: string
+        minLength: 1
+      repeat:
+        type: integer
+        minimum: 1
+      started_at:
+        type: string
+      completed_at:
+        type:
+          - string
+          - "null"
+      seconds:
+        type: number
+        minimum: 0
+      human:
+        type: string
+      status:
+        enum:
+          - complete
+          - partial
+          - failed
 
   experiment:
     type: object
