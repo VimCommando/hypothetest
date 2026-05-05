@@ -64,8 +64,12 @@ Investigates response time distribution shape.
 
 ### `drill_down` — Root Cause Drill-Down
 
-Post-analysis method. Used by the Analyst after identifying a regression, not
-prescribed at compile time. Layer-by-layer investigation until root cause.
+Not a during-phase method and not a pipeline artifact. This is an Analyst
+mental model: when a regression is identified, the Analyst narrows from
+system-level signals to the specific layer causing the issue. It does not
+appear in `diagnostics.during.methods`, has no `collect_drill_down`
+function, and produces no TOON files. It is purely an interpretation
+pattern the Analyst applies when writing the report.
 
 ## Profiles
 

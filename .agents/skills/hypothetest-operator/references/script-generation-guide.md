@@ -53,6 +53,11 @@ filling in the collection functions for the active methods and verified
 packages. Functions referenced here are defined in the "Signal extraction"
 section below.
 
+The script assumes the working directory is the evaluation root (the
+directory containing `hypothetest.yml` and `generated/`). The Operator
+sets this via `cd` before invocation. All output paths (`evidence/during/`)
+are relative to this root.
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -74,11 +79,9 @@ OUTPUT_DIR="evidence/during"
 RAW_DIR="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-raw"
 mkdir -p "$RAW_DIR"
 
-# --- per-method TOON files ---
-declare -A METHOD_FILES
-for method in "${METHODS[@]}"; do
-  METHOD_FILES[$method]="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-${method}.toon"
-done
+# --- per-method TOON files (generated per active method) ---
+METHOD_FILE_use="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-use.toon"
+# METHOD_FILE_latency=...  (Operator adds one line per active method)
 
 # --- collection dispatch ---
 # The Operator generates this function body based on active methods.
@@ -97,13 +100,22 @@ echo "[start] variation=$VARIATION repeat=$REPEAT phase=$PHASE_NAME interval=${I
 PHASE_PID=$!
 
 cleanup() { kill "$PHASE_PID" 2>/dev/null; wait "$PHASE_PID" 2>/dev/null; }
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 
-# --- write TOON headers ---
-# (Operator generates header lines per method — see TOON output section)
+# --- write TOON headers (generated per active method) ---
+write_headers() {
+  cat > "$METHOD_FILE_use" <<'TOON'
+method: use
+interval: 10s
+packages[1]: elasticsearch_api
+samples[N]{t,cpu_pct,heap_pct,gc_old,gc_old_ms,gc_young,gc_young_ms,tp_write_q,tp_write_r,tp_search_q,tp_search_r,disk_total_bytes,disk_free_bytes}:
+TOON
+  # Operator adds one block per active method (latency, tsa, etc.)
+}
 write_headers
 
 # --- sampling loop ---
+START_TIME=$(date +%s)
 T=0
 while kill -0 "$PHASE_PID" 2>/dev/null; do
   SAMPLE_START=$(date +%s)
@@ -121,10 +133,15 @@ done
 wait "$PHASE_PID"
 PHASE_EXIT=$?
 
-# final sample after phase completes
-collect_all "$T" 2>/dev/null
+ELAPSED=$(( $(date +%s) - START_TIME ))
 
-echo "[phase_complete] variation=$VARIATION repeat=$REPEAT phase=$PHASE_NAME elapsed=${T}s exit=$PHASE_EXIT"
+if (( ELAPSED < 15 )); then
+  echo "[skip] reason=short_phase elapsed=${ELAPSED}s"
+else
+  collect_all "$T" 2>/dev/null
+fi
+
+echo "[phase_complete] variation=$VARIATION repeat=$REPEAT phase=$PHASE_NAME elapsed=${ELAPSED}s exit=$PHASE_EXIT"
 exit "$PHASE_EXIT"
 ```
 
@@ -133,7 +150,8 @@ Key design decisions in the skeleton:
 - **`PHASE_CMD=("$@")`** — command passed as separate args, not a string.
   The Operator invokes: `./sample.sh baseline 1 load_data espipe load --input ./data/docs.ndjson`
 - **Per-method TOON files** — each method writes its own file. No single
-  monolithic samples file.
+  monolithic samples file. Uses `$METHOD_FILE_<method>` variables (not
+  associative arrays) for bash 3.2 compatibility on macOS.
 - **`collect_all` dispatches to `collect_<method>`** — the Operator fills in
   only the method functions for active methods. Unused methods don't exist
   in the generated script.
@@ -207,7 +225,7 @@ collect_use() {
   disk_total=$(echo "$raw" | jq '[.nodes[].fs.total.total_in_bytes] | add')
   disk_free=$(echo "$raw" | jq '[.nodes[].fs.total.free_in_bytes] | add')
 
-  echo "  ${t},${cpu_pct},${heap_pct},${gc_old},${gc_old_ms},${gc_young},${gc_young_ms},${tp_write_q},${tp_write_r},${tp_search_q},${tp_search_r},${disk_total},${disk_free}" >> "${METHOD_FILES[use]}"
+  echo "  ${t},${cpu_pct},${heap_pct},${gc_old},${gc_old_ms},${gc_young},${gc_young_ms},${tp_write_q},${tp_write_r},${tp_search_q},${tp_search_r},${disk_total},${disk_free}" >> "$METHOD_FILE_use"
   echo "[sample] t=$t method=use cpu_pct=$cpu_pct heap_pct=$heap_pct gc_old=$gc_old tp_write_q=$tp_write_q"
 }
 ```
@@ -243,7 +261,7 @@ collect_latency() {
   query_total=$(echo "$raw" | jq '[.nodes[].indices.search.query_total] | add')
   query_time=$(echo "$raw" | jq '[.nodes[].indices.search.query_time_in_millis] | add')
 
-  echo "  ${t},${query_total},${query_time}" >> "${METHOD_FILES[latency]}"
+  echo "  ${t},${query_total},${query_time}" >> "$METHOD_FILE_latency"
   echo "[sample] t=$t method=latency query_total=$query_total query_time_ms=$query_time"
 }
 ```
@@ -269,6 +287,47 @@ collect_tsa() {
 interprets thread state fractions from the snapshots. No TOON row — TSA
 produces a directory of text files, not a time-series.
 
+### `collect_on_cpu` — On-CPU method
+
+Linux only. Requires `perf` (Coordinator verifies `CAP_PERFMON` or root).
+
+```bash
+collect_on_cpu() {
+  local t=$1
+  local oncpu_dir="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-on_cpu"
+  mkdir -p "$oncpu_dir"
+  perf record -g -p "$ES_PID" -o "$oncpu_dir/perf_t${t}.data" -- sleep 1 2>/dev/null || return 1
+  perf script -i "$oncpu_dir/perf_t${t}.data" > "$oncpu_dir/perf_t${t}.txt" 2>/dev/null
+  echo "[sample] t=$t method=on_cpu archived=perf_t${t}.data"
+}
+```
+
+Like TSA, on-CPU produces archived data rather than time-series TOON rows.
+The Analyst interprets the flame graph / top frames from the perf output.
+
+### `collect_off_cpu` — Off-CPU method
+
+Linux only. Requires `bpftrace` (Coordinator verifies `CAP_BPF` or root).
+
+```bash
+collect_off_cpu() {
+  local t=$1
+  local offcpu_dir="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-off_cpu"
+  mkdir -p "$offcpu_dir"
+  timeout "${INTERVAL}s" bpftrace -e 'profile:hz:99 /pid == '"$ES_PID"'/ { @[kstack] = count(); }' \
+    > "$offcpu_dir/offcpu_t${t}.txt" 2>/dev/null || true
+  echo "[sample] t=$t method=off_cpu archived=offcpu_t${t}.txt"
+}
+```
+
+Off-CPU also produces archived stack data. The Analyst identifies dominant
+wait classes (I/O, lock, sleep) from the captured stacks.
+
+`$ES_PID` is resolved by the Operator at script generation time — for
+compose targets, it wraps commands with `docker exec` to access the JVM
+process. Both `on_cpu` and `off_cpu` are only generated when the
+Coordinator reports their packages as verified.
+
 ## TOON output specification
 
 Each method writes its own TOON file. The `write_headers` function in the
@@ -293,6 +352,11 @@ samples[18]{t,cpu_pct,heap_pct,gc_old,gc_old_ms,...,host_cpu_usr,host_cpu_sys,di
 ```
 
 ### Latency samples
+
+When the `latency` method is the primary investigation method, the
+Operator may reduce the interval (e.g., 5s instead of the default 10s)
+for finer-grained response time tracking. The interval is always declared
+in the TOON header.
 
 ```toon
 method: latency
