@@ -302,6 +302,32 @@ measure:
 
 The Architect should include these API lists in `generated/metrics-plan.yml` and ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.
 
+## During-phase observation
+
+Optionally recommend `diagnostics.during` when the scenario benefits from
+interval-based observation during phase execution. This is additive — boundary
+diagnostics (`at`) remain the default and work without `during`.
+
+```yaml
+measure:
+  diagnostics:
+    tool: esdiag
+    at: { ... }
+    during:
+      profile: standard
+```
+
+Prescription rules:
+
+- Recommend for ingest throughput, search latency, or CPU-bound scenarios.
+- Skip for short phases (<15s) or simple storage comparisons.
+- Default to profile `standard`. Use `light` for latency-sensitive or cloud targets.
+- Add explicit methods (`latency`, `on_cpu`, `tsa`) when the scenario warrants deeper investigation.
+- When the `latency` method is active, set `shape: percentile_set` on latency metrics.
+
+See `references/observation-methods.md` for the full method catalog, profiles,
+and prescription guidance.
+
 ## Validation checklist
 
 Before finalizing a blueprint:
@@ -351,3 +377,4 @@ Return concrete files or patches when possible. Avoid abstract brainstorming onc
 - `references/compose-target.md`
 - `references/canonical-schema.md`
 - `references/evaluation-template.sh`
+- `references/observation-methods.md`
