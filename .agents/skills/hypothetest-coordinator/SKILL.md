@@ -249,6 +249,13 @@ credential_requirements[1]{name,status,required_for}:
   ELASTICSEARCH_URL,missing,existing deployment
 tool_access[1]{tool,required_for,runs_from,status,preflight}:
   esdiag,diagnostics,operator environment,missing,ESDIAG_KEYSTORE_PASSWORD unavailable in nohup environment
+observation:
+  os: darwin
+  during_profile: standard
+  packages[2]{name,status,note}:
+    elasticsearch_api,verified,http://localhost:9200
+    darwin_tools,verified,vm_stat iostat
+  jq: verified
 operator_handoff:
   blueprint: blueprint.yml
   scenario: hypothetest.yml

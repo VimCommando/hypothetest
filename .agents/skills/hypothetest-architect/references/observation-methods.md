@@ -115,14 +115,24 @@ diagnostics:
     phases: [load_data]
 ```
 
-## Package availability by deployment target
+## Platform-aware prescription
 
-| Target | Available packages |
-|---|---|
-| `compose/local` | `elasticsearch_api`, host CLI tools (`sysstat`, `procps`, etc.) |
-| `compose/remote` | `elasticsearch_api`, host CLI via SSH |
-| `elastic-cloud` | `elasticsearch_api` only |
-| `existing` | `elasticsearch_api`, host tools if user declares access |
+The Architect prescribes methods. The Coordinator discovers what packages are
+available. The Operator generates a script scoped to what's actually there.
 
-When compiling for `elastic-cloud` or restricted targets, constrain to
-`elasticsearch_api` package only (profile `light`).
+The Architect does not need to enumerate packages — prescribe the method and
+profile, and the Operator will use whatever the Coordinator verified. Only
+specify explicit packages when the user wants to **narrow** collection (e.g.,
+"only ES APIs, no host tools").
+
+| Target | What the Operator gets | Typical profile |
+|---|---|---|
+| `compose/local` (Linux) | ES APIs + sysstat + procps + maybe jdk_tools | `standard` |
+| `compose/local` (macOS) | ES APIs + darwin_tools (vm_stat, iostat) | `standard` |
+| `compose/remote` | ES APIs + remote host tools via SSH | `standard` |
+| `elastic-cloud` | ES APIs only | `light` |
+| `existing` | ES APIs + host tools if user declares access | `light` or `standard` |
+
+For `elastic-cloud` or restricted targets, recommend profile `light` —
+the Coordinator will report that only `elasticsearch_api` is verified, and
+the Operator will generate accordingly.
