@@ -412,7 +412,8 @@ $defs:
 
   observation_profile:
     type: string
-    enum:
+    minLength: 1
+    examples:
       - none
       - light
       - standard
@@ -420,13 +421,13 @@ $defs:
 
   observation_method:
     type: string
-    enum:
+    minLength: 1
+    examples:
       - use
       - tsa
       - off_cpu
       - on_cpu
       - latency
-      - drill_down
 
   package:
     type: object
@@ -436,7 +437,8 @@ $defs:
     properties:
       name:
         type: string
-        enum:
+        minLength: 1
+        examples:
           - elasticsearch_api
           - sysstat
           - procps

@@ -285,12 +285,13 @@ Output location:
 ```text
 evidence/
   during/
-    <variation>-<repeat>-<phase>-samples.toon
+    <variation>-<repeat>-<phase>-<method>.toon
+    <variation>-<repeat>-<phase>-tsa/     (text archive when TSA active)
     <variation>-<repeat>-<phase>-raw/
 ```
 
-The Analyst receives the `.toon` summary, not raw tool output. Raw output is
-archived for debugging.
+Each method writes its own TOON file. The Analyst receives per-method
+summaries, not raw tool output. Raw output is archived for debugging.
 
 See `references/script-generation-guide.md` for output discipline, concurrency
 patterns, and script skeleton.

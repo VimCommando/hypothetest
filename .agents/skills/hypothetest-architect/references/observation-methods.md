@@ -85,8 +85,8 @@ Named method combinations. Use as shorthand in `diagnostics.during.profile`.
 3. Start with `standard` unless there's a reason for more or less.
 4. For latency benchmarks, add the `latency` method (promotes metrics to percentile_set).
 5. For CPU investigations, add `on_cpu` and `tsa`.
-6. `drill_down` is never prescribed — it's an Analyst-time reaction.
-7. `workload_characterization` is an Architect prompt (section F), not a during-phase method.
+6. `off_cpu`, `on_cpu`, and `tsa` (with `jdk_tools`) require Linux host tools or JVM access. Do not prescribe them for macOS or cloud targets — the Coordinator will report their packages as unavailable. Prefer `use` + `latency` on those platforms.
+7. `drill_down` is not a during-phase method — it's a post-analysis Analyst pattern. Do not include it in `diagnostics.during.methods`.
 
 ## Schema shape
 

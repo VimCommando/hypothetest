@@ -24,66 +24,121 @@ include platform-specific code for a platform that isn't the target.
 
 ```
 hypothetest.yml            readiness.toon
-       ↓                        ↓
+       |                        |
   [Operator reads during block + available packages]
-       ↓
+       |
   [generates sampling script scoped to platform + packages]
-       ↓
+       |
   [script runs: background phase + foreground sampling]
-       ↓
-  evidence/during/<v>-<r>-<p>-samples.toon    ← Analyst reads
-  evidence/during/<v>-<r>-<p>-raw/            ← debugging archive
-       ↓
+       |
+  evidence/during/<v>-<r>-<p>-<method>.toon   <- Analyst reads
+  evidence/during/<v>-<r>-<p>-raw/             <- debugging archive
+       |
   [Analyst interprets: steady state, limiters, patterns]
 ```
 
 ## Script structure
 
-Bash by default. Use Python when the experiment needs JSON parsing and `jq`
-is unavailable (Coordinator reports this).
+Bash by default. Use Python when `jq` is unavailable (Coordinator reports
+`jq: missing` in readiness TOON).
 
-Every generated script follows this skeleton:
+The Operator generates one script per experiment. The script accepts the
+variation, repeat, phase name, and phase command as arguments. The script is
+invoked once per phase execution.
+
+### Skeleton
+
+This is the complete structure. The Operator adapts it per experiment —
+filling in the collection functions for the active methods and verified
+packages. Functions referenced here are defined in the "Signal extraction"
+section below.
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- config (generated from hypothetest.yml) ---
+# --- generated config ---
 ES_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
 INTERVAL=10
+METHODS=(use)  # populated from diagnostics.during.methods
+
+# --- arguments ---
 VARIATION="$1"
 REPEAT="$2"
-PHASE_CMD="$3"
-OUTPUT_DIR="evidence/during"
+PHASE_NAME="$3"
+shift 3
+PHASE_CMD=("$@")  # remaining args are the command + arguments
 
-# --- setup ---
-mkdir -p "$OUTPUT_DIR"
-SAMPLES_FILE="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-samples.toon"
+# --- output paths ---
+OUTPUT_DIR="evidence/during"
 RAW_DIR="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-raw"
 mkdir -p "$RAW_DIR"
 
+# --- per-method TOON files ---
+declare -A METHOD_FILES
+for method in "${METHODS[@]}"; do
+  METHOD_FILES[$method]="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-${method}.toon"
+done
+
+# --- collection dispatch ---
+# The Operator generates this function body based on active methods.
+# Each method has its own collect_<method> function defined below.
+collect_all() {
+  local t=$1
+  for method in "${METHODS[@]}"; do
+    "collect_${method}" "$t" || echo "[error] t=$t method=$method"
+  done
+}
+
 # --- phase lifecycle ---
-$PHASE_CMD &
+echo "[start] variation=$VARIATION repeat=$REPEAT phase=$PHASE_NAME interval=${INTERVAL}s methods=${METHODS[*]}"
+
+"${PHASE_CMD[@]}" &
 PHASE_PID=$!
-trap 'kill $PHASE_PID 2>/dev/null; exit 1' INT TERM
+
+cleanup() { kill "$PHASE_PID" 2>/dev/null; wait "$PHASE_PID" 2>/dev/null; }
+trap cleanup INT TERM
+
+# --- write TOON headers ---
+# (Operator generates header lines per method — see TOON output section)
+write_headers
 
 # --- sampling loop ---
 T=0
-write_toon_header
 while kill -0 "$PHASE_PID" 2>/dev/null; do
-  collect_sample "$T"
-  T=$((T + INTERVAL))
-  sleep "$INTERVAL"
+  SAMPLE_START=$(date +%s)
+  collect_all "$T"
+  SAMPLE_ELAPSED=$(( $(date +%s) - SAMPLE_START ))
+
+  if (( SAMPLE_ELAPSED >= INTERVAL )); then
+    echo "[skip] t=$T reason=collection_slow elapsed=${SAMPLE_ELAPSED}s"
+  else
+    sleep $(( INTERVAL - SAMPLE_ELAPSED ))
+  fi
+  T=$(( T + INTERVAL ))
 done
 
 wait "$PHASE_PID"
 PHASE_EXIT=$?
 
-# --- finalize ---
-collect_sample "$T"  # final sample
-write_toon_footer
-echo "[phase_complete] variation=$VARIATION repeat=$REPEAT elapsed=${T}s exit=$PHASE_EXIT"
+# final sample after phase completes
+collect_all "$T" 2>/dev/null
+
+echo "[phase_complete] variation=$VARIATION repeat=$REPEAT phase=$PHASE_NAME elapsed=${T}s exit=$PHASE_EXIT"
+exit "$PHASE_EXIT"
 ```
+
+Key design decisions in the skeleton:
+
+- **`PHASE_CMD=("$@")`** — command passed as separate args, not a string.
+  The Operator invokes: `./sample.sh baseline 1 load_data espipe load --input ./data/docs.ndjson`
+- **Per-method TOON files** — each method writes its own file. No single
+  monolithic samples file.
+- **`collect_all` dispatches to `collect_<method>`** — the Operator fills in
+  only the method functions for active methods. Unused methods don't exist
+  in the generated script.
+- **Skip-on-slow** — if collection takes longer than the interval, skip
+  instead of queuing. Log it.
 
 ### Stdout discipline
 
@@ -91,12 +146,12 @@ Stdout is for the LLM — one structured line per event. Every line costs
 tokens.
 
 ```
-[start] variation=baseline repeat=1 phase=load_data interval=10s packages=elasticsearch_api,darwin_tools
-[sample] t=10 cpu_pct=45 heap_pct=62 gc_old=3
+[start] variation=baseline repeat=1 phase=load_data interval=10s methods=use
+[sample] t=10 method=use cpu_pct=45 heap_pct=62 gc_old=3
 [phase_complete] variation=baseline repeat=1 phase=load_data elapsed=185s exit=0
 ```
 
-Detailed data goes to files. Do not print raw API responses to stdout.
+Detailed data goes to TOON files. Do not print raw API responses to stdout.
 
 ### Error handling
 
@@ -104,36 +159,38 @@ Detailed data goes to files. Do not print raw API responses to stdout.
 |---|---|
 | Collection takes longer than interval | Skip, log `[skip] t=N reason=collection_slow` |
 | Phase finishes mid-collection | Complete current sample, record phase exit |
-| API endpoint temporarily unreachable | Log `[error] t=N reason=endpoint_unreachable`, continue |
+| API endpoint temporarily unreachable | Log `[error] t=N method=M`, continue |
 | Phase exits non-zero | Collect final sample, record exit code, do not abort |
 | Phase duration <15s | Log `[skip] reason=short_phase`, write no samples |
 
 ### Idempotency
 
-Output files are namespaced `<variation>-<repeat>-<phase>`. Re-running a
-failed variation does not corrupt previous results.
+Output files are namespaced `<variation>-<repeat>-<phase>-<method>`. Re-running
+a failed variation does not corrupt previous results.
 
 ## Signal extraction
 
-The script extracts **method signals**, not raw API responses. The method
-defines what signals matter; the package provides the raw data; the script
-extracts and normalizes.
+Each method has a `collect_<method>` function. The Operator generates only the
+functions for methods that are active in the experiment. Each function:
 
-### USE method signals
+1. Hits the relevant API or tool
+2. Archives raw output to `$RAW_DIR`
+3. Extracts signals via jq (or Python fallback)
+4. Appends one TOON row to the method's output file
+5. Prints a summary `[sample]` line to stdout
 
-The USE method needs utilization, saturation, and error indicators per
-resource. The primary source is `_nodes/stats`.
+### `collect_use` — USE method
 
-From `_nodes/stats` (always available):
+Primary source: `_nodes/stats` (always available).
 
 ```bash
-collect_use_es() {
+collect_use() {
+  local t=$1
   local raw
-  raw=$(curl -s "$ES_URL/_nodes/stats/os,jvm,thread_pool,fs")
-  echo "$raw" > "$RAW_DIR/nodes_stats_t${T}.json"
+  raw=$(curl -sf "$ES_URL/_nodes/stats/os,jvm,thread_pool,fs") || return 1
+  echo "$raw" > "$RAW_DIR/nodes_stats_t${t}.json"
 
-  # Extract via jq (or Python fallback)
-  local cpu_pct heap_pct heap_max gc_old gc_old_ms gc_young gc_young_ms
+  local cpu_pct heap_pct gc_old gc_old_ms gc_young gc_young_ms
   local tp_write_q tp_write_r tp_search_q tp_search_r
   local disk_total disk_free
 
@@ -150,69 +207,89 @@ collect_use_es() {
   disk_total=$(echo "$raw" | jq '[.nodes[].fs.total.total_in_bytes] | add')
   disk_free=$(echo "$raw" | jq '[.nodes[].fs.total.free_in_bytes] | add')
 
-  echo "  ${T},${cpu_pct},${heap_pct},${gc_old},${gc_old_ms},${gc_young},${gc_young_ms},${tp_write_q},${tp_write_r},${tp_search_q},${tp_search_r},${disk_total},${disk_free}" >> "$SAMPLES_FILE"
+  echo "  ${t},${cpu_pct},${heap_pct},${gc_old},${gc_old_ms},${gc_young},${gc_young_ms},${tp_write_q},${tp_write_r},${tp_search_q},${tp_search_r},${disk_total},${disk_free}" >> "${METHOD_FILES[use]}"
+  echo "[sample] t=$t method=use cpu_pct=$cpu_pct heap_pct=$heap_pct gc_old=$gc_old tp_write_q=$tp_write_q"
 }
 ```
 
-From host tools (when available — **supplements** ES APIs, does not replace):
+When Linux host tools are verified, the Operator adds supplementary
+extraction to the same function:
 
-| Signal | Linux (sysstat/procps) | macOS (darwin_tools) |
+| Signal | Linux command | Extraction |
 |---|---|---|
-| Host CPU | `mpstat 1 1` → `%usr + %sys` | `vm_stat` → not direct; use ES cpu_pct |
-| Disk I/O util | `iostat -x 1 1` → `%util` | `iostat` → limited |
-| Memory pressure | `free -b` → used/total | `vm_stat` → pages active/wired/free |
-| Network | `ss -s` or `/proc/net/dev` | `netstat -ib` |
+| Host CPU | `mpstat 1 1` | `tail -1`, parse `%usr + %sys` |
+| Disk I/O | `iostat -x 1 1` | `tail -n +4`, parse `%util` per device |
+| Memory | `free -b` | parse used/total from `Mem:` line |
 
-### Latency method signals
+When macOS darwin_tools are verified, supplement with:
 
-From `_nodes/stats` or Rally output:
+| Signal | macOS command | Extraction |
+|---|---|---|
+| Memory pressure | `vm_stat` | parse pages free/active/wired |
+
+These supplement the ES API signals — they don't replace them. The TOON
+header gains additional columns when host tools are present.
+
+### `collect_latency` — Latency method
 
 ```bash
-collect_latency_es() {
+collect_latency() {
+  local t=$1
   local raw
-  raw=$(curl -s "$ES_URL/_nodes/stats/indices/search")
-  echo "$raw" > "$RAW_DIR/search_stats_t${T}.json"
+  raw=$(curl -sf "$ES_URL/_nodes/stats/indices/search") || return 1
+  echo "$raw" > "$RAW_DIR/search_stats_t${t}.json"
 
   local query_total query_time
   query_total=$(echo "$raw" | jq '[.nodes[].indices.search.query_total] | add')
   query_time=$(echo "$raw" | jq '[.nodes[].indices.search.query_time_in_millis] | add')
 
-  echo "  ${T},${query_total},${query_time}" >> "$LATENCY_FILE"
+  echo "  ${t},${query_total},${query_time}" >> "${METHOD_FILES[latency]}"
+  echo "[sample] t=$t method=latency query_total=$query_total query_time_ms=$query_time"
 }
 ```
 
-For percentile-level latency, the script captures from Rally's output or
-from a dedicated search probe loop (generate a probe function that runs
-a representative query and records wall-clock time).
+For percentile-level latency, the Operator generates a probe function that
+runs a representative query and records wall-clock response time. This is
+experiment-specific — the Operator writes the probe based on the blueprint's
+search phases.
 
-### TSA method signals
-
-From `_nodes/hot_threads`:
+### `collect_tsa` — TSA method
 
 ```bash
-collect_tsa_es() {
-  local raw
-  raw=$(curl -s "$ES_URL/_nodes/hot_threads?threads=5")
-  echo "$raw" > "$RAW_DIR/hot_threads_t${T}.txt"
-  # TSA interpretation is Analyst-side — the script archives the raw output
+collect_tsa() {
+  local t=$1
+  local tsa_dir="$OUTPUT_DIR/${VARIATION}-${REPEAT}-${PHASE_NAME}-tsa"
+  mkdir -p "$tsa_dir"
+  curl -sf "$ES_URL/_nodes/hot_threads?threads=5" > "$tsa_dir/hot_threads_t${t}.txt" || return 1
+  echo "[sample] t=$t method=tsa archived=hot_threads_t${t}.txt"
 }
 ```
 
 `hot_threads` output is text, not JSON. The script archives it; the Analyst
-interprets thread state fractions from the archived snapshots.
+interprets thread state fractions from the snapshots. No TOON row — TSA
+produces a directory of text files, not a time-series.
 
 ## TOON output specification
+
+Each method writes its own TOON file. The `write_headers` function in the
+skeleton generates these headers based on active methods.
 
 ### USE samples
 
 ```toon
 method: use
 interval: 10s
-packages[2]: elasticsearch_api,darwin_tools
+packages[1]: elasticsearch_api
 samples[18]{t,cpu_pct,heap_pct,gc_old,gc_old_ms,gc_young,gc_young_ms,tp_write_q,tp_write_r,tp_search_q,tp_search_r,disk_total_bytes,disk_free_bytes}:
   0,12,45,0,0,0,0,0,0,0,0,107374182400,96636764160
   10,45,62,3,120,2,40,0,0,2,0,107374182400,95496069120
   20,78,71,5,340,4,85,12,0,4,0,107374182400,93415538688
+```
+
+When host tools add columns, the header expands:
+
+```toon
+samples[18]{t,cpu_pct,heap_pct,gc_old,gc_old_ms,...,host_cpu_usr,host_cpu_sys,disk_util_pct,mem_used_bytes,mem_total_bytes}:
 ```
 
 ### Latency samples
@@ -220,20 +297,32 @@ samples[18]{t,cpu_pct,heap_pct,gc_old,gc_old_ms,gc_young,gc_young_ms,tp_write_q,
 ```toon
 method: latency
 interval: 5s
-samples[N]{t,query_total,query_time_ms,query_delta,time_delta_ms,avg_latency_ms}:
-  0,0,0,0,0,0
-  5,1200,4500,1200,4500,3.75
-  10,2450,9200,1250,4700,3.76
+samples[N]{t,query_total,query_time_ms}:
+  0,0,0
+  5,1200,4500
+  10,2450,9200
 ```
 
-### Combined (multiple methods)
-
-When multiple methods are active, write separate TOON files per method:
+### TSA (no TOON — text archive)
 
 ```
-evidence/during/baseline-1-load_data-use.toon
-evidence/during/baseline-1-load_data-latency.toon
-evidence/during/baseline-1-load_data-tsa/    (directory of text snapshots)
+evidence/during/baseline-1-load_data-tsa/
+  hot_threads_t0.txt
+  hot_threads_t10.txt
+  hot_threads_t20.txt
+```
+
+### Output file layout
+
+```
+evidence/during/
+  baseline-1-load_data-use.toon
+  baseline-1-load_data-latency.toon
+  baseline-1-load_data-tsa/
+  baseline-1-load_data-raw/
+    nodes_stats_t0.json
+    nodes_stats_t10.json
+    search_stats_t0.json
 ```
 
 ## Platform collection patterns
@@ -327,7 +416,7 @@ execute evaluation phases via sampling script (when during is declared)
 The sampling script wraps the phase command. The Operator invokes:
 
 ```bash
-./generated/scripts/sample.sh "$VARIATION" "$REPEAT" "$PHASE_CMD"
+./generated/scripts/sample.sh "$VARIATION" "$REPEAT" "$PHASE_NAME" espipe load --input ./data/docs.ndjson --target benchmark-index
 ```
 
 When `during` is not declared, the Operator runs phases directly as before.
