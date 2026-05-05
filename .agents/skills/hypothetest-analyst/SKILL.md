@@ -328,6 +328,33 @@ Every generated measurement document must preserve:
 
 Record custom ingestion decisions in `dashboards/README.md`, including the target index or data stream, template path, source TOON path, espipe command used or recommended, and whether ingestion was actually executed.
 
+## During-phase interpretation
+
+When `evidence/during/` contains sample TOON files, incorporate during-phase
+observations into the analysis:
+
+1. **Steady-state detection.** Were metrics stable during the phase, or still
+   trending? If trending, note that the phase may not have reached steady state.
+
+2. **Limiter identification.** When the USE method produced samples, identify
+   the limiting resource per variation×phase from the USE taxonomy:
+   `cpu`, `memory`, `disk_io`, `network`, `gc_pressure`, `lock_contention`,
+   `thread_pool_saturation`, `merge_throttle`, `app_internal`, `unknown`.
+
+   Evidence required: cite specific TOON field and value. Without USE data,
+   limiter is `unknown`.
+
+3. **Method-specific patterns:**
+   - USE: saturated resource = limiter
+   - TSA: flag any thread state >10% that isn't Execute or Idle
+   - Latency: bimodal detection, p99/p50 ratio, moving modes
+   - Off-CPU: dominant wait class
+   - On-CPU: hot path, differential between variations
+
+4. **Report section.** Add `## Limiting factor` after Primary metrics when
+   during-phase data is present. Each variation×phase gets limiter + evidence.
+   Omit this section when no during-phase data exists.
+
 ## Interpretation guidance
 
 - Keep the main result tied to the user's original question.

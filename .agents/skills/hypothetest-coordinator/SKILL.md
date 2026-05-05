@@ -119,11 +119,22 @@ Availability is not readiness. A tool is ready only when the Coordinator has ver
 For every concrete scenario, build a tool access matrix:
 
 - `tool`: `docker`, `podman`, `espipe`, `rally`/`esrally`, `esdiag`, `ys`, `toon`, `ssh`, or a declared phase runtime.
-- `required_for`: deployment, dataset loading, workload execution, diagnostics, results processing, schema validation, or reporting.
+- `required_for`: deployment, dataset loading, workload execution, diagnostics, during-phase observation, results processing, schema validation, or reporting.
 - `runs_from`: local operator host, remote SSH host, container, or declared phase host.
 - `credential_requirements`: environment variables, saved profiles, keystore passwords, API keys, TLS files, SSH config names, or config paths.
 - `access_preflight`: the non-destructive command or check used to prove access.
 - `status`: `verified`, `missing`, `failed`, or `not_required`.
+
+When `measure.diagnostics.during` is declared, inventory observation packages:
+
+- OS detection (Linux, macOS, other)
+- Binary availability for each prescribed package (`which iostat`, `which jstat`, etc.)
+- Permission checks for privileged tools (CAP_BPF/CAP_PERFMON for bpftrace, root for perf)
+- Report available and unavailable packages in readiness output
+
+Unavailable packages are warnings, not blockers — the Operator skips them and
+collects from whatever is available. The exception: if no packages are available
+at all, the `during` block cannot execute and should be flagged.
 
 Do not mark readiness `ready` when a required tool is merely installed. Mark it `blocked` if any required tool credential, keystore password, config file, endpoint, filesystem permission, or remote execution context is missing or unverified.
 

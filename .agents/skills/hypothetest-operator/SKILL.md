@@ -261,6 +261,40 @@ metrics[2]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
   example,evaluation-001,compose,candidate,1,warm_search,search_latency_p99,150,ms,rally,ok
 ```
 
+## During-phase observation
+
+When `measure.diagnostics.during` is declared, generate a sampling script that
+collects interval-based observations while phases execute. This extends the
+existing pattern of generating compose assets — the sampling script is another
+generated infrastructure artifact.
+
+The generated script handles:
+
+1. Running the phase command in the background.
+2. Polling at the declared interval (default 10s) using the prescribed packages.
+3. Writing structured summary data to TOON files per variation×repeat×phase.
+4. Archiving raw tool output alongside.
+5. Cleaning up on phase completion, failure, or signal.
+
+Minimum phase duration threshold: skip during-phase sampling for phases likely
+under 15 seconds. The script detects this via elapsed time and records a
+`[skip]` event.
+
+Output location:
+
+```text
+evidence/
+  during/
+    <variation>-<repeat>-<phase>-samples.toon
+    <variation>-<repeat>-<phase>-raw/
+```
+
+The Analyst receives the `.toon` summary, not raw tool output. Raw output is
+archived for debugging.
+
+See `references/script-generation-guide.md` for output discipline, concurrency
+patterns, and script skeleton.
+
 ## Evaluation Record
 
 Create `evaluation.yml` as the schema-valid index of the completed or partial
@@ -331,3 +365,4 @@ Partial evaluations are valid Analyst inputs as long as `manifest.toon` records 
 
 - `references/operator-evaluation-guide.md`
 - `references/artifacts.md`
+- `references/script-generation-guide.md`
