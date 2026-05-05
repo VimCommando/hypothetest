@@ -304,7 +304,53 @@ $defs:
           - $ref: "#/$defs/diagnostics"
 
   metric:
-    description: Metric name string or an object with name, source, unit, and extraction details.
+    oneOf:
+      - type: string
+        minLength: 1
+      - type: object
+        additionalProperties: false
+        required:
+          - name
+        properties:
+          name:
+            type: string
+            minLength: 1
+          source:
+            enum:
+              - elasticsearch_api
+              - espipe
+              - rally
+              - phase_artifact
+              - esdiag
+              - shell
+              - computed
+          unit:
+            type: string
+            minLength: 1
+          api:
+            type: string
+            minLength: 1
+          artifact:
+            type: string
+            minLength: 1
+          field:
+            type: string
+            minLength: 1
+          phase:
+            type: string
+            minLength: 1
+          shape:
+            enum:
+              - scalar
+              - percentile_set
+              - histogram
+            default: scalar
+          measures:
+            type: string
+            minLength: 1
+          validity_note:
+            type: string
+            minLength: 1
 
   diagnostics:
     type: object
@@ -331,6 +377,91 @@ $defs:
               items:
                 type: string
                 minLength: 1
+      during:
+        $ref: "#/$defs/during"
+
+  during:
+    oneOf:
+      - type: object
+        additionalProperties: false
+        properties:
+          profile:
+            $ref: "#/$defs/observation_profile"
+          methods:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/observation_method"
+          interval:
+            type: string
+            pattern: ^\d+[smh]$
+            default: 10s
+          packages:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/package"
+          phases:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+      - $ref: "#/$defs/observation_profile"
+
+  observation_profile:
+    type: string
+    enum:
+      - none
+      - light
+      - standard
+      - comprehensive
+
+  observation_method:
+    type: string
+    enum:
+      - use
+      - tsa
+      - off_cpu
+      - on_cpu
+      - latency
+      - drill_down
+
+  package:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        enum:
+          - elasticsearch_api
+          - sysstat
+          - procps
+          - jdk_tools
+          - perf
+          - bcc_tools
+          - bpftrace
+          - iproute2
+          - coreutils
+          - darwin_tools
+      commands:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      scripts:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      apis:
+        type: array
+        items:
+          type: string
+          minLength: 1
 
   compare:
     type: object
