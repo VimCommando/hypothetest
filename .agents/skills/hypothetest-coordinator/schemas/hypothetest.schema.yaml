@@ -384,6 +384,7 @@ $defs:
     oneOf:
       - type: object
         additionalProperties: false
+        minProperties: 1
         properties:
           profile:
             $ref: "#/$defs/observation_profile"

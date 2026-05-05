@@ -11,7 +11,7 @@
    - reset state
    - load dataset through the declared indexing/workload tool
    - apply variation setup
-   - execute evaluation phases
+   - execute evaluation phases (via sampling script when `diagnostics.during` is declared)
    - collect diagnostics with `esdiag` using the YAML-defined API list for each collection point
    - optionally process the diagnostic bundle to a results cluster
    - archive artifacts

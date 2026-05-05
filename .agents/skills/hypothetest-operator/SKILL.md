@@ -263,8 +263,10 @@ metrics[2]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
 
 ## During-phase observation
 
-When `measure.diagnostics.during` is declared, generate a sampling script that
-collects interval-based observations while phases execute. This extends the
+When `measure.diagnostics.during` is declared and its profile is not `none`,
+generate a sampling script that collects interval-based observations while
+phases execute. `profile: none` explicitly disables during-phase observation —
+do not generate a script. This extends the
 existing pattern of generating compose assets — the sampling script is another
 generated infrastructure artifact.
 
@@ -275,6 +277,9 @@ The generated script handles:
 3. Writing structured summary data to TOON files per variation×repeat×phase.
 4. Archiving raw tool output alongside.
 5. Cleaning up on phase completion, failure, or signal.
+
+When `diagnostics.during.phases` lists specific phase names, only sample during
+those phases. When omitted, sample during all evaluation phases.
 
 Minimum phase duration threshold: skip during-phase sampling for phases likely
 under 15 seconds. The script detects this via elapsed time and records a

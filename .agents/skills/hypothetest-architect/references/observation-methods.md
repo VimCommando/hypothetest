@@ -90,23 +90,31 @@ Named method combinations. Use as shorthand in `diagnostics.during.profile`.
 
 ## Schema shape
 
+Option 1 — profile shorthand:
 ```yaml
 diagnostics:
-  tool: esdiag
-  at: { ... }          # boundary snapshots (unchanged)
+  during: standard
+```
 
-  during:              # NEW — optional
-    # Option 1: profile shorthand
-    profile: standard
-
-    # Option 2: explicit methods
+Option 2 — explicit methods:
+```yaml
+diagnostics:
+  during:
     methods: [use, off_cpu]
+```
 
-    # Option 3: profile + additional methods
+Option 3 — profile + additional methods:
+```yaml
+diagnostics:
+  during:
     profile: standard
     methods: [off_cpu]
+```
 
-    # Option 4: full custom
+Option 4 — full custom:
+```yaml
+diagnostics:
+  during:
     interval: 10s
     packages:
       - name: elasticsearch_api
