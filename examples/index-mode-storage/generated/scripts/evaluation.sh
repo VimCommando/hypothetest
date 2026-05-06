@@ -71,7 +71,6 @@ function print_help_main() {
     echo "    -r, --run-id <ID>      Stable run identifier"
     echo "    -n, --dry-run          Print commands without executing task bodies"
     echo "    -d, --debug            Enable debug logging"
-    echo "        --keep-going       Continue independent task groups after failures"
     echo "        --no-color         Disable colorized output"
     echo "        --seed <INT>       Randomization seed (default: derived from run-id)"
     echo "        --version          Print template version"
@@ -88,7 +87,6 @@ blueprint_root="$(cd "${script_dir}/../.." && pwd)"
 
 declare env_file=""
 declare command="run"
-declare keep_going="false"
 declare seed=""
 
 export LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -273,6 +271,17 @@ function task_validate_prerequisites() {
     command -v curl >/dev/null || { log_error "curl not found"; return 1; }
     command -v jq >/dev/null || { log_error "jq not found"; return 1; }
     test -f "${HYPOTHETEST_PLAN}" || { log_error "Plan file missing: ${HYPOTHETEST_PLAN}"; return 1; }
+
+    local license_type
+    license_type=$(curl -sf "${ELASTICSEARCH_URL}/_license" | grep -o '"type":"[^"]*"' | cut -d'"' -f4) || true
+    case "${license_type}" in
+        trial|enterprise|platinum)
+            log_info "License: ${license_type} — logsdb_synthetic_source eligible"
+        ;;
+        *)
+            log_warn "License: ${license_type:-unknown} — logsdb_synthetic_source requires enterprise or trial license"
+        ;;
+    esac
 }
 
 function task_prepare_workspace() {
@@ -388,8 +397,6 @@ function execute_slot() {
 }
 
 function task_run_evaluation() {
-    generate_run_order
-
     for slot in "${RUN_ORDER[@]}"; do
         execute_slot "${slot}"
     done
@@ -436,6 +443,7 @@ PLAN
 }
 
 function command_run() {
+    cd "${blueprint_root}"
     run_task validate_prerequisites
     run_task prepare_workspace
     run_task compose_up
@@ -504,10 +512,6 @@ while [[ $# -gt 0 ]]; do
             seed="${1}"
             shift
         ;;
-        --keep-going)
-            keep_going="true"
-            shift
-        ;;
         --no-color)
             colorize=false
             shift
@@ -527,7 +531,6 @@ done
 env_file_source
 environment_setup
 log_debug "Input command: $(white "${command}")"
-log_debug "Keep going: $(cyan "${keep_going}")"
 
 case "${command}" in
     "help"|"-h"|"--help" )
