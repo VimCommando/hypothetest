@@ -98,6 +98,7 @@ If the evaluation is partial, analyze completed data but lead with missing or fa
 Use these deployment quality labels:
 
 - `compose`: development-grade
+- `kubernetes`: development-grade on k3s or lightweight distributions; environment-dependent on managed or production Kubernetes
 - `existing`: environment-dependent
 - `elastic-cloud`: benchmark-grade, assuming isolation and repeatability controls are satisfied
 
@@ -376,6 +377,6 @@ observations into the analysis:
 - `references/metric-normalization.md`
 - `references/measurement-schema.md`
 - `references/index_template.yml`
-- `../../hypothetest-coordinator/references/observation-methods.md`
+- `../hypothetest-coordinator/references/observation-methods.md`
   *(shared — Source of truth in Coordinator. Method catalog: collection shapes,
   TOON output formats, output file layout, interpretation patterns.)*

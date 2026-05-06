@@ -32,7 +32,7 @@ hypothetest coordinator check --blueprint blueprints/index-mode-storage/
 hypothetest operator evaluation --blueprint blueprints/index-mode-storage/
 ```
 
-See `generated/evaluation-guide.md` for the full step-by-step operator procedure.
+See `generated/scripts/evaluation.sh` for the full evaluation sequence.
 
 ## Files
 
@@ -43,7 +43,7 @@ hypothetest.yml        — canonical execution plan
 generated/
   compose/             — Podman Compose assets
   metrics-plan.yml     — metric sources and collection points
-  evaluation-guide.md  — operator step-by-step evaluation guide
+  scripts/             — evaluation, compose lifecycle, load, and reset scripts
 ```
 
 ## Elasticsearch Version

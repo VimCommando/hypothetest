@@ -22,8 +22,9 @@ Implement `compose` first.
 Supported initial deployment targets:
 
 1. `compose`
-2. `existing`
-3. `elastic-cloud`
+2. `kubernetes`
+3. `existing`
+4. `elastic-cloud`
 
 For MVP work, prefer local compose using Docker or Podman.
 
@@ -127,6 +128,25 @@ generated/compose/.env
 generated/compose/elasticsearch.yml
 generated/compose/repositories/
 generated/compose/volumes/
+```
+
+The Operator does not generate or modify these assets.
+
+## Kubernetes assets
+
+The Coordinator generates kubernetes infrastructure. The Operator consumes it
+via `generated/scripts/eck-up.sh` and `eck-down.sh`. When the provider is k3s,
+`generated/scripts/k3s-install.sh` and `k3s-uninstall.sh` handle the cluster
+lifecycle independently. Expected layout:
+
+```text
+generated/eck/namespace.yaml
+generated/eck/elasticsearch.yaml
+generated/eck/kibana.yaml          (only when services.kibana: true)
+generated/scripts/eck-up.sh
+generated/scripts/eck-down.sh
+generated/scripts/k3s-install.sh   (only when provider: k3s)
+generated/scripts/k3s-uninstall.sh (only when provider: k3s)
 ```
 
 The Operator does not generate or modify these assets.

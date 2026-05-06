@@ -71,6 +71,6 @@ The system PATH resolves `espipe` to the Homebrew 0.2.0 binary
 ```
 blueprint:  blueprints/index-mode-storage/blueprint.yml
 plan:       blueprints/index-mode-storage/hypothetest.yml
-evaluation_guide: blueprints/index-mode-storage/generated/evaluation-guide.md
+evaluation:  blueprints/index-mode-storage/generated/scripts/evaluation.sh
 readiness:  blueprints/index-mode-storage/generated/readiness.md
 ```

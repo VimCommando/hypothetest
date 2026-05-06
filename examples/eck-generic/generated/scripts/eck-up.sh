@@ -99,6 +99,9 @@ fi
 
 # --- port-forward for local access ---
 PF_PIDFILE="${HYPOTHETEST_EVALUATION_ROOT:-.}/port-forward.pid"
+cleanup_pf() { kill "${PF_PID}" 2>/dev/null || true; rm -f "${PF_PIDFILE}"; }
+trap cleanup_pf INT TERM
+
 kubectl port-forward -n "${NAMESPACE}" "service/${CLUSTER_NAME}-es-http" 9200:9200 &
 PF_PID=$!
 echo "${PF_PID}" > "${PF_PIDFILE}"
@@ -119,6 +122,7 @@ if [[ "${SECURITY_ENABLED}" == "true" ]]; then
 fi
 
 if curl "${CURL_ARGS[@]}" "${ES_URL}/_cluster/health" | grep -qE '"status":"(green|yellow)"'; then
+  trap - INT TERM
   echo "[healthy] elapsed=${elapsed}s url=${ES_URL} port_forward_pid=${PF_PID}"
   exit 0
 fi
