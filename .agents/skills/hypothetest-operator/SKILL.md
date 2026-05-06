@@ -264,42 +264,71 @@ metrics[2]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
 ## During-phase observation
 
 When `measure.diagnostics.during` is declared and its profile is not `none`,
-generate a sampling script that collects interval-based observations while
-phases execute. `profile: none` explicitly disables during-phase observation —
-do not generate a script. This extends the
-existing pattern of generating compose assets — the sampling script is another
-generated infrastructure artifact.
+the Coordinator generates `generated/scripts/sample.sh` — a sampling script
+that collects interval-based observations while phases execute. The Operator
+does not generate this script; it runs it.
 
-The generated script handles:
+### Invocation
 
-1. Running the phase command in the background.
-2. Polling at the declared interval (default 10s) using the prescribed packages.
-3. Writing structured summary data to TOON files per variation×repeat×phase.
-4. Archiving raw tool output alongside.
-5. Cleaning up on phase completion, failure, or signal.
+When during-phase observation is active, evaluation.sh task functions for
+workload phases delegate to sample.sh instead of running the phase command
+directly:
 
-When `diagnostics.during.phases` lists specific phase names, only sample during
-those phases. When omitted, sample during all evaluation phases.
-
-Minimum phase duration threshold: skip during-phase sampling for phases likely
-under 15 seconds. The script detects this via elapsed time and records a
-`[skip]` event.
-
-Output location:
-
-```text
-evidence/
-  during/
-    <variation>-<repeat>-<phase>-<method>.toon
-    <variation>-<repeat>-<phase>-tsa/     (text archive when TSA active)
-    <variation>-<repeat>-<phase>-raw/
+```bash
+./generated/scripts/sample.sh "$VARIATION" "$REPEAT" "$PHASE_NAME" \
+  espipe load --input ./data/docs.ndjson --target benchmark-index
 ```
 
-Each method writes its own TOON file. The Analyst receives per-method
-summaries, not raw tool output. Raw output is archived for debugging.
+When `diagnostics.during` is absent or `profile: none`, evaluation.sh calls
+the phase command directly — no sample.sh wrapper.
 
-See `references/script-generation-guide.md` for output discipline, concurrency
-patterns, and script skeleton.
+When `diagnostics.during.phases` lists specific phase names, only those
+phases are wrapped. When omitted, all evaluation phases are wrapped.
+
+### Structured stdout
+
+sample.sh writes structured `[tag] key=value` lines to stdout.
+evaluation.sh's `run_task` captures these to `${HYPOTHETEST_LOG_DIR}/<task>.log`.
+The Operator reads the log files to determine phase outcomes.
+
+| Tag | Meaning |
+|---|---|
+| `[start]` | Phase sampling began; includes variation, repeat, phase, interval, methods |
+| `[sample]` | One sample collected; includes t, method, key signal values |
+| `[skip]` | Sample skipped; reason is `collection_slow` or `short_phase` |
+| `[error]` | Collection failed for one method at time t; sampling continues |
+| `[phase_complete]` | Phase finished; includes elapsed time and exit code |
+
+When sample.sh backgrounds the phase command, both the phase's stdout and
+sampling `[tag]` lines land in the same log file. Parse by `[tag]` prefix,
+not by line position.
+
+### Exit codes
+
+| Code | Meaning | Operator action |
+|---|---|---|
+| 0 | Phase succeeded, sampling complete | Continue to next phase |
+| Non-zero | Phase command exited non-zero | Record failure, apply `continue_on_error` policy |
+
+sample.sh passes through the phase command's exit code. Sampling failures
+(API unreachable, slow collection) are logged but do not change the exit code.
+
+### Output layout
+
+All artifacts land under `${HYPOTHETEST_EVIDENCE_DIR}/during/`:
+
+```
+${HYPOTHETEST_EVIDENCE_DIR}/during/
+  <variation>-<repeat>-<phase>-<method>.toon   # time-series (use, latency)
+  <variation>-<repeat>-<phase>-tsa/            # text archive (TSA)
+  <variation>-<repeat>-<phase>-on_cpu/         # perf archive
+  <variation>-<repeat>-<phase>-off_cpu/        # bpftrace archive
+  <variation>-<repeat>-<phase>-raw/            # raw API responses (debugging)
+```
+
+Methods that produce time-series (use, latency) write TOON files. Methods
+that produce snapshots (tsa, on_cpu, off_cpu) write directories. Raw API
+responses are always archived regardless of method.
 
 ## Evaluation Record
 
