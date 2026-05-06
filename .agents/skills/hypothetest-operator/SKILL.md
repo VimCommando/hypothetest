@@ -1,13 +1,19 @@
 ---
 name: hypothetest-operator
-description: Implement and evaluate Hypothetest Elasticsearch benchmark blueprints. Use when the user has a blueprint or hypothetest.yml and wants compose/Docker/Podman assets, execution scripts, evaluation artifacts, monitoring, Rally/espipe invocation, or operator guidance.
+description: Execute Hypothetest evaluation blueprints. Use when the user has a blueprint with Coordinator-generated assets and wants to run evaluation.sh, collect artifacts, monitor phases, invoke Rally/espipe, or get operator guidance.
 ---
 
 # Hypothetest Operator Skill
 
 You are the operator for Hypothetest.
 
-Your job is to follow the Architect's blueprint: turn `hypothetest.yml` and supporting assets into executable assets, execute or prepare the evaluation, monitor phases, and preserve artifacts. Think of the Operator as the machinery operator who follows the plans created by the Architect. Do not reinterpret the scientific question; if the blueprint is invalid, return actionable errors and route back to the Architect.
+Your job is to run the evaluation: execute `evaluation.sh` (which the Architect
+compiled), read its logs and output artifacts, and record the evaluation.yml
+and manifest.toon. Think of the Operator as the machinery operator who runs
+the plans — no generation, no helper scripts. The Coordinator generates
+environment-specific scripts; the Operator calls them through evaluation.sh.
+Do not reinterpret the scientific question; if the blueprint is invalid,
+return actionable errors and route back to the Architect.
 
 ## Initial target priority
 
@@ -110,9 +116,10 @@ Execute compose operations on the remote host in the declared `deployment.remote
 
 For remote compose, treat SSH as the deployment control plane, not the dataset transport. Do not copy raw corpus files to `deployment.remote.workdir` by default. Load data through the declared indexing/workload tool, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the remote deployment. Only stage raw data on the remote host when the blueprint explicitly declares remote data generation, a remote download, or a remote-local phase script.
 
-## Compose generated assets
+## Compose assets
 
-Generate or maintain:
+The Coordinator generates compose infrastructure. The Operator consumes it
+via `generated/scripts/compose-up.sh` and `compose-down.sh`. Expected layout:
 
 ```text
 generated/compose/compose.yml
@@ -122,9 +129,7 @@ generated/compose/repositories/
 generated/compose/volumes/
 ```
 
-For snapshot/searchable-snapshot scenarios on local compose, configure an Elasticsearch filesystem repository. Mount the repository directory into the Elasticsearch container and set `path.repo` in `elasticsearch.yml`. MinIO and S3-compatible services are out of scope for local compose.
-
-Generated compose assets must be deterministic for the same `hypothetest.yml`. Prefer named volumes unless the scenario explicitly asks for bind mounts.
+The Operator does not generate or modify these assets.
 
 ## Execution loop
 
@@ -398,6 +403,4 @@ Partial evaluations are valid Analyst inputs as long as `manifest.toon` records 
 
 ## References
 
-- `references/operator-evaluation-guide.md`
 - `references/artifacts.md`
-- `references/script-generation-guide.md`
