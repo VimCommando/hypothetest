@@ -48,7 +48,7 @@ Identify and verify only what is necessary for the requested scenario or onboard
 - Local tools: Docker, Podman, compose support, Rust/Cargo, Hypothetest-compatible Rust binaries, curl, jq, toon, repo-local Rust tooling, and any scenario-declared script interpreters.
 - Credentials: Elasticsearch URLs, usernames, passwords, API keys, Elastic Cloud IDs, Kibana credentials when needed, snapshot repository credentials for non-local targets, and results-cluster credentials for diagnostics.
 - Tool access: every required tool must have the credentials, environment variables, config files, keystore passwords, endpoint access, filesystem permissions, and runtime environment it needs to execute in the same context the Operator will use.
-- Deployment target prerequisites: `compose`, `existing`, or `elastic-cloud`.
+- Deployment target prerequisites: `compose`, `kubernetes`, `existing`, or `elastic-cloud`.
 - Dataset access: loader-local files, generated fixtures, Rally tracks, espipe input, checksums, and any explicit remote downloads.
 - Evaluation safety: host path access, disk space concerns, destructive reset scope, and whether variation isolation can be honored.
 - Handoff artifacts: readiness summary, missing items, environment variable names, redaction guidance, and next-step routing.
@@ -112,7 +112,7 @@ If Cargo is missing, report it as a setup blocker because several preferred Hypo
 
 Ask the smallest useful set of questions:
 
-1. Which deployment target should be prepared: `compose`, `existing`, or `elastic-cloud`?
+1. Which deployment target should be prepared: `compose`, `kubernetes`, `existing`, or `elastic-cloud`?
 2. Which dataset loader is expected: Rally, espipe, or unknown?
 3. Should diagnostics be collected with esdiag?
 
@@ -161,6 +161,7 @@ If diagnostics provide primary or required secondary metrics, missing esdiag cre
 For `compose`:
 
 - Verify at least one compose engine path exists: `docker compose`, `podman compose`, or `podman-compose`.
+- If `deployment.scope` is `remote`, echo the target before acting: "Deploying to `<ssh_config_host>` at `<workdir>`. Is this the right host?" Confirm before proceeding.
 - If `deployment.scope` is `remote`, validate SSH access to `deployment.remote.auth.ssh_config_host` using the user's `.ssh/config`, optional `deployment.remote.user`, and certificate-based auth.
 - If `deployment.scope` is `remote`, validate the remote user can execute the selected compose command: `docker compose version`, `podman compose version`, or `podman-compose --version`.
 - If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
@@ -170,14 +171,40 @@ For `compose`:
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
 - Confirm generated volume and repository paths are repo-local or clearly declared.
 
+For `kubernetes`:
+
+Kubernetes provider detection and confirmation:
+
+- Run `kubectl cluster-info` to detect an existing cluster.
+- If `deployment.kubernetes.provider` is declared, validate it. If `existing` and no cluster found, mark readiness `blocked`. If `k3s` and cluster already found, skip k3s install.
+- If `deployment.kubernetes.provider` is omitted, ask the user:
+  - **Cluster found:** "I found Kubernetes cluster `<context-name>` at `<endpoint>`. I'll create a `hypothetest` namespace and deploy ECK there. Is this the right cluster? If you'd rather use an isolated throwaway, I can install k3s instead."
+  - **No cluster found:** "No Kubernetes cluster detected. I can install k3s — a lightweight single-node Kubernetes that runs as a system service. Clean removal with `k3s-uninstall.sh` when you're done. Proceed?"
+- When provider is explicitly declared, skip the question but still echo what you're targeting before acting ("Using existing cluster `<context>` at `<endpoint>`" or "Installing k3s as declared").
+- Record the resolved provider in readiness.toon as `kubernetes_provider: existing` or `kubernetes_provider: k3s`.
+
+Kubernetes readiness checks (after provider is resolved):
+
+- Verify `kubectl` can reach the cluster: `kubectl cluster-info`.
+- Verify `helm` is available for ECK operator installation.
+- Check whether the ECK operator is already installed in `elastic-system` namespace.
+- If `deployment.kubernetes.install_operator: true` and operator is missing, note that `eck-up.sh` will install it.
+- If `deployment.kubernetes.install_operator: false` and operator is missing, mark readiness `blocked`.
+- Verify the declared namespace can be created or already exists.
+- Check `vm.max_map_count` kernel setting; report as `verified` or `unverified` (drives initContainer generation decision in CRD manifests).
+- Confirm the scenario's memory and storage expectations are realistic for the Kubernetes cluster's available resources.
+- When `deployment.elasticsearch.security: false`, note that generated manifests will disable TLS and security — suitable for dev-grade local iteration, not production.
+
 For `existing`:
 
+- Echo the target before acting: "I'll run benchmarks against the Elasticsearch cluster at `<endpoint>`. This includes destructive resets (index deletion, cache clearing) in the `<namespace/prefix>` scope. Is this the right cluster?"
 - Identify endpoint, auth method, TLS behavior, and whether destructive resets are allowed.
 - Require an explicit namespace, index prefix, or disposable test cluster confirmation before destructive phases.
 - Confirm the user understands that results are environment-dependent.
 
 For `elastic-cloud`:
 
+- Echo the target before acting: "I'll run benchmarks against Elastic Cloud deployment `<cloud_id or deployment_name>`. This includes destructive resets and may incur cost. Is this the right deployment?"
 - Identify Cloud ID or endpoint, auth method, deployment ownership, and cleanup expectations.
 - Confirm whether credentials are available through environment variables or a saved profile.
 - Confirm cost and destructive reset boundaries before execution.
@@ -290,12 +317,17 @@ selects and fills patterns from the reference catalog.
 |---|---|---|
 | `generated/scripts/compose-up.sh` | Start cluster (compose target) | compose templates |
 | `generated/scripts/compose-down.sh` | Stop cluster (compose target) | compose templates |
+| `generated/scripts/k3s-install.sh` | Install k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
+| `generated/scripts/k3s-uninstall.sh` | Remove k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
+| `generated/scripts/eck-up.sh` | Start cluster (kubernetes target) | `references/eck-templates.md` |
+| `generated/scripts/eck-down.sh` | Stop cluster (kubernetes target) | `references/eck-templates.md` |
 | `generated/scripts/sample.sh` | During-phase observation | `references/script-templates.md` |
 | `generated/scripts/reset.sh` | Variation reset (delete indices, clear caches) | calling convention contract |
 | `generated/scripts/load.sh` | Dataset loading wrapper | calling convention contract |
 
 Also generate `generated/compose/` (compose.yml, .env, elasticsearch.yml)
-or `generated/eck/` for the declared deployment target.
+or `generated/eck/` (namespace.yaml, elasticsearch.yaml, optionally
+kibana.yaml) for the declared deployment target.
 
 ### Script calling convention
 
@@ -340,6 +372,9 @@ only the files relevant to the current blueprint.
 - `references/tools/rally.md` — when `dataset.loader: rally`
 - `references/tools/docker.md` — when `deployment.engine` resolves to `docker`
 - `references/tools/podman.md` — when `deployment.engine` resolves to `podman`
+- `references/tools/kubectl.md` — when `deployment.target: kubernetes`
+- `references/tools/helm.md` — when `deployment.target: kubernetes`
+- `references/tools/k3s.md` — when `deployment.kubernetes.provider` resolves to `k3s`
 - `references/tools/jq.md` — when `diagnostics.during` is declared
 
 **Loaded by prescribed method or profile:**
@@ -351,7 +386,7 @@ only the files relevant to the current blueprint.
 
 - **Always:** `references/script-templates.md` (skeleton, collection catalog)
 - **target: compose:** compose template references
-- **target: eck:** ECK template references (future, separate effort)
+- **target: kubernetes:** `references/eck-templates.md` (CRD patterns, operator installation, service exposure)
 - **diagnostics.during declared:** `references/observation-methods.md`
 
 Never load both compose and ECK reference sets simultaneously.
