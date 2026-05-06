@@ -1,0 +1,85 @@
+index_patterns:
+  - metrics-measurement-hypothetest
+data_stream: {}
+template:
+  mappings:
+    dynamic: true
+    dynamic_templates:
+      - strings_as_keywords:
+          match_mapping_type: string
+          mapping:
+            type: keyword
+      - longs_not_indexed:
+          match_mapping_type: long
+          mapping:
+            type: long
+            index: false
+      - doubles_not_indexed:
+          match_mapping_type: double
+          mapping:
+            type: double
+            index: false
+      - booleans_not_indexed:
+          match_mapping_type: boolean
+          mapping:
+            type: boolean
+            index: false
+    properties:
+      "@timestamp":
+        type: date
+      data_stream:
+        properties:
+          type:
+            type: constant_keyword
+            value: metrics
+          dataset:
+            type: constant_keyword
+            value: measurement
+          namespace:
+            type: constant_keyword
+            value: hypothetest
+      evaluation:
+        type: keyword
+      scenario:
+        type: keyword
+      started_at:
+        type: date
+      completed_at:
+        type: date
+      deployment:
+        type: keyword
+      variation:
+        type: keyword
+      repeat:
+        type: integer
+      phase:
+        type: keyword
+      metric:
+        type: keyword
+      value:
+        type: double
+      unit:
+        type: keyword
+      source:
+        type: keyword
+      status:
+        type: keyword
+      artifact:
+        type: keyword
+      baseline:
+        type: keyword
+      candidate:
+        type: keyword
+      delta_absolute:
+        type: double
+      delta_percent:
+        type: double
+      confidence:
+        type: keyword
+  settings:
+    index: {}
+priority: 500
+_meta:
+  description: "Default Hypothetest measurement data stream template"
+  data_stream: metrics-measurement-hypothetest
+  schema: hypothetest-measurement-v1

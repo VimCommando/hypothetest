@@ -206,7 +206,7 @@ Use the `kibana-dashboards` skill after report compilation, in this order:
 2. Identify which collected evidence is already queryable in Elasticsearch:
    - Reuse `esdiag` results data streams when diagnostics were processed into a results cluster.
    - Reuse any Rally, espipe, phase-output, or custom measurement indices already declared in `evaluation.yml` or `manifest.toon`.
-3. For Hypothetest measurements that are only local artifacts and not already indexed, create a custom evidence dataset before dashboard creation.
+3. For Hypothetest measurements that are only local artifacts and not already indexed, create documents for the shared custom measurement data stream before dashboard creation.
 4. Write generated dashboard definitions and ingestion assets under `dashboards/`.
 5. Test Kibana connectivity with the dashboard skill's required command before creating or updating dashboards.
 6. If the Kibana connection test fails, preserve the dashboard JSON and ingestion assets, explain the required environment variables in the report appendix or final response, and stop before attempting dashboard API writes.
@@ -220,10 +220,9 @@ dashboards/
   hypothetest-overview.dashboard.json
   hypothetest-diagnostics.dashboard.json
   data/
-    measurements.ndjson
+    measurements.toon
   elasticsearch/
-    hypothetest-measurements-template.json
-    hypothetest-measurements-pipeline.json
+    index_template.yml
 ```
 
 Prefer inline ES|QL visualization panels in dashboard definitions. Build dense operational dashboards with primary KPIs and key trends above the fold. Use descriptive chart titles, no markdown header panels, and time ranges that cover the evaluation run.
@@ -253,44 +252,81 @@ Only index custom Hypothetest evidence when the needed dashboard data is not alr
 
 Use `espipe` for custom ingestion. Provide:
 
-- an index template or composable template with correct field types for Kibana visualizations
-- an ingest pipeline when fields need parsing, normalization, unit conversion, timestamp assignment, or keyword copying
-- an NDJSON document file derived from normalized analysis artifacts, preserving links back to source artifacts
+- an index template or composable template with correct field types for Kibana visualizations; start from `references/index_template.yml`
+- a TOON measurement file derived from normalized analysis artifacts, preserving links back to source artifacts
 
-Use a dedicated index or data stream pattern such as:
+Store custom measurement documents in this shared data stream:
 
 ```text
-hypothetest-measurements-*
+metrics-measurement-hypothetest
 ```
+
+Never create a unique measurement data stream per evaluation. Use the document-level `evaluation` keyword for dashboard filters and cross-run comparison.
+
+Conform custom measurement documents to `references/measurement-schema.md`. Keep local measurement artifacts compact and human-readable. Do not expand natural fields into ECS field paths:
+
+- `@timestamp` is the measurement timestamp or best available evaluation timestamp.
+- `evaluation` is the stable top-level keyword used to filter all documents from one evaluation.
+- `scenario`, `deployment`, `variation`, `repeat`, and `phase` are natural benchmark dimensions.
+- `metric`, `value`, `unit`, `source`, and `status` are natural metric fields.
+- `baseline`, `candidate`, deltas, and confidence are natural comparison fields.
+- `data_stream.*` is defined in the index template as constant keywords for the shared stream identity.
 
 Minimum custom measurement fields:
 
 ```text
 @timestamp
-evaluation.id
-evaluation.scenario
-evaluation.started_at
-evaluation.completed_at
-deployment.target
-variation.name
-repeat.number
-phase.name
-metric.name
-metric.value
-metric.unit
-metric.source
-metric.status
-comparison.baseline
-comparison.candidate
-comparison.delta_absolute
-comparison.delta_percent
-confidence
-artifact.path
+evaluation
+scenario
+started_at
+completed_at
+deployment
+variation
+repeat
+phase
+metric
+value
+unit
+source
+status
+artifact
 ```
 
-Map identifiers and labels as `keyword`, metric values and deltas as numeric types, timestamps as `date`, and long report text or caveats as `text` plus `.keyword` only when useful for grouping. Do not flatten semantically different measurements into the same metric name without a phase or dimension field.
+Optional comparison fields:
 
-Record custom ingestion decisions in `dashboards/README.md`, including the target index or data stream, template path, pipeline path if any, source NDJSON path, espipe command used or recommended, and whether ingestion was actually executed.
+```text
+baseline
+candidate
+delta_absolute
+delta_percent
+confidence
+```
+
+Map indexed fields consistently: identifiers and labels as `keyword`, metric values and deltas as numeric types, timestamps as `date`, and long report text or caveats as `text` plus `.keyword` only when useful for grouping. Do not flatten semantically different measurements into the same metric name without a phase or dimension field.
+
+### Measurement transform
+
+The Analyst is the transform boundary for custom measurement documents:
+
+1. Read local evidence from `evaluation.yml`, `manifest.toon`, `summary.toon`, `comparison.toon`, phase outputs, Rally outputs, espipe outputs, API output, shell output, and Python output.
+2. Extract source-specific facts without changing their meaning.
+3. Normalize extracted values into stable metric and comparison rows using the existing `metrics[...]` and `comparisons[...]` TOON shapes.
+4. Convert each normalized metric row into one compact TOON measurement row conforming to `references/measurement-schema.md`.
+5. Write the rows to `dashboards/data/measurements.toon`.
+6. Ingest that TOON file with espipe's native TOON input support into `metrics-measurement-hypothetest` after the template is ready.
+
+Keep business logic in the Analyst transform. Do not add an ECS-compatibility ingest pipeline. If an evaluation needs an ingest pipeline for source-specific cleanup, keep it limited to that cleanup and do not use it to rename fields into ECS paths.
+
+Do not transform `esdiag` documents into `metrics-measurement-hypothetest`. When `esdiag process` has shipped diagnostics to Elasticsearch, dashboards must query those `esdiag` data streams directly and use `metrics-measurement-hypothetest` only for Hypothetest run-level measurements that are not already indexed elsewhere.
+
+Every generated measurement document must preserve:
+
+- the evaluation filter key through top-level `evaluation`
+- benchmark dimensions as compact `scenario`, `deployment`, `variation`, `repeat`, and `phase` fields
+- numeric metric data as compact `metric` and `value` fields
+- a source artifact path when the value came from a local artifact
+
+Record custom ingestion decisions in `dashboards/README.md`, including the target index or data stream, template path, source TOON path, espipe command used or recommended, and whether ingestion was actually executed.
 
 ## Interpretation guidance
 
@@ -311,3 +347,5 @@ Record custom ingestion decisions in `dashboards/README.md`, including the targe
 
 - `references/report-template.md`
 - `references/metric-normalization.md`
+- `references/measurement-schema.md`
+- `references/index_template.yml`
