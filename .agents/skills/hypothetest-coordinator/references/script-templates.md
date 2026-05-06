@@ -331,6 +331,12 @@ For compose targets:
 ES_PID=$(docker exec <container_name> pgrep -f elasticsearch)
 ```
 
+For ECK targets:
+```bash
+ES_POD=$(kubectl get pods -n "${NAMESPACE}" -l elasticsearch.k8s.elastic.co/cluster-name="${CLUSTER_NAME}" -o jsonpath='{.items[0].metadata.name}')
+ES_PID=$(kubectl exec -n "${NAMESPACE}" "${ES_POD}" -- pgrep -f elasticsearch)
+```
+
 For local/existing targets with direct JVM access:
 ```bash
 ES_PID=$(pgrep -f elasticsearch)
@@ -375,6 +381,15 @@ jstat -gcutil $ES_PID 1000 1                # GC activity detail
 jstack $ES_PID > "$RAW_DIR/jstack_t${T}.txt"  # thread dump (TSA)
 ```
 
+### jdk_tools (ECK, via kubectl exec)
+
+Same JDK tools, accessed through kubectl instead of docker exec:
+
+```bash
+kubectl exec -n "${NAMESPACE}" "${ES_POD}" -- jstat -gcutil $ES_PID 1000 1
+kubectl exec -n "${NAMESPACE}" "${ES_POD}" -- jstack $ES_PID > "$RAW_DIR/jstack_t${T}.txt"
+```
+
 ### perf, bpftrace, bcc_tools (Linux, privileged)
 
 Coordinator checks CAP_BPF/CAP_PERFMON or root. Only include when verified.
@@ -385,4 +400,30 @@ Supplementary — experiments work without them.
 ```bash
 vm_stat | head -10    # pages free, active, inactive, wired
 iostat -c 2           # I/O (limited compared to Linux)
+```
+
+### ECK observation differences
+
+When `deployment.target: kubernetes`, the ES API observation methods work
+unchanged (they hit the Elasticsearch endpoint the same way). The
+differences are in host/container-level tools:
+
+| Compose | ECK equivalent |
+|---|---|
+| `docker exec <container> <cmd>` | `kubectl exec -n <ns> <pod> -- <cmd>` |
+| `docker logs <container>` | `kubectl logs -n <ns> <pod>` |
+| `docker stats` (CPU/memory) | `kubectl top pods -n <ns>` |
+| `docker exec <container> pgrep -f elasticsearch` | `kubectl exec -n <ns> <pod> -- pgrep -f elasticsearch` |
+
+`esdiag` works unchanged — it hits the ES endpoint, not the container
+runtime.
+
+Pod log collection:
+```bash
+kubectl logs -n "${NAMESPACE}" "${ES_POD}" > "$RAW_DIR/es_log_t${T}.txt"
+```
+
+Container-level resource usage (requires metrics-server):
+```bash
+kubectl top pods -n "${NAMESPACE}" --no-headers
 ```
