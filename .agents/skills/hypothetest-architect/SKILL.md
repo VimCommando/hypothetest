@@ -69,11 +69,12 @@ If any required intent is missing in compile mode, fail with a short error list 
 
 ## Deployment targets
 
-Initial target order:
+Target order:
 
 1. `compose` — first-class local iteration target using Docker or Podman.
-2. `existing` — existing Elasticsearch cluster.
-3. `elastic-cloud` — managed deployment target.
+2. `kubernetes` — Kubernetes target using Elastic Cloud on Kubernetes (ECK) operator.
+3. `existing` — existing Elasticsearch cluster.
+4. `elastic-cloud` — managed deployment target.
 
 Prefer `compose` unless the user explicitly asks for another target.
 
@@ -88,6 +89,7 @@ deployment:
   engine: auto
   elasticsearch:
     version: 8.18.0
+    nodes: 1
     security: false
     heap: 2g
     memory: 4g
@@ -122,6 +124,38 @@ deployment:
 For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to execute the selected compose engine before Operator execution.
 
 Remote compose SSH controls the deployment host only. Do not imply that raw dataset files are copied to `deployment.remote.workdir`. Dataset ingestion still happens through the declared loader, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the deployment. Only generated compose assets, operator scripts, runtime manifests, and deployment support files belong on the remote SSH host unless the blueprint explicitly declares a remote-generated fixture or remote-local phase script.
+
+## Kubernetes defaults
+
+When target is `kubernetes`, use these defaults unless overridden:
+
+```yaml
+deployment:
+  target: kubernetes
+  namespace: hypothetest
+  elasticsearch:
+    version: 9.0.0
+    nodes: 1
+    storage: 10Gi
+    security: false
+    heap: 2g
+    memory: 4g
+  services:
+    kibana: false
+  kubernetes:
+    operator_version: 3.3.2
+    install_operator: true
+```
+
+When `kubernetes.provider` is omitted, the Coordinator detects whether a
+cluster exists and asks the user before acting. Explicit `provider: k3s`
+or `provider: existing` skips the question.
+
+Kubernetes output should be marked development-grade when running on k3s
+or similar lightweight distributions. The Coordinator generates CRD
+manifests in `generated/eck/` and lifecycle scripts (`eck-up.sh`,
+`eck-down.sh`) that follow the same calling convention contract as
+compose scripts.
 
 ## Dataset loaders
 
@@ -350,7 +384,7 @@ Before finalizing a blueprint:
 - `experiment.constants.best_effort` identifies controls that may be platform-managed or not directly configurable, and interpretation limits explain their impact.
 - Statistical plans declare the null hypothesis, alternative hypothesis, alpha, confidence, test method, test direction, assumptions, and practical effect threshold when those are relevant.
 - Multiple primary metrics or multiple candidates declare a multiple-comparison correction strategy or mark the comparison exploratory.
-- Deployment target is one of `compose`, `existing`, or `elastic-cloud`.
+- Deployment target is one of `compose`, `kubernetes`, `existing`, or `elastic-cloud`.
 - Dataset loader is `rally` or `espipe`.
 - At least two variations exist.
 - A baseline is named and exists in variations.
