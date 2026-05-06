@@ -33,4 +33,6 @@ test -n "${ESDIAG_KEYSTORE_PASSWORD:-}"
 ```
 
 ## URL
-https://crates.io/crates/esdiag
+
+- https://github.com/elastic/esdiag
+- https://crates.io/crates/esdiag

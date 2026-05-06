@@ -30,4 +30,6 @@ espipe --help | grep -q -- '--template'
 ```
 
 ## URL
-https://crates.io/crates/espipe
+
+- https://github.com/VimCommando/espipe
+- https://crates.io/crates/espipe

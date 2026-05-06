@@ -24,4 +24,6 @@ echo 'name: test' | ys --schema /dev/null -
 ```
 
 ## URL
-https://crates.io/crates/yaml-schema
+
+- https://github.com/yaml/yamlscript
+- https://crates.io/crates/yaml-schema
