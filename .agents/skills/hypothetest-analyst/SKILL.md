@@ -330,7 +330,7 @@ Record custom ingestion decisions in `dashboards/README.md`, including the targe
 
 ## During-phase interpretation
 
-When `evidence/during/` contains sample TOON files, incorporate during-phase
+When `${HYPOTHETEST_EVIDENCE_DIR}/during/` contains sample TOON files, incorporate during-phase
 observations into the analysis:
 
 1. **Steady-state detection.** Were metrics stable during the phase, or still

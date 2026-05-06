@@ -163,7 +163,6 @@ evaluation:
     - delete_indices
     - clear_caches
     - reload_dataset
-    - delete_volumes
     - verify_cluster_green
 ```
 

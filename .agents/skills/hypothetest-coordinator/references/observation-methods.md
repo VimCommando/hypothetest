@@ -123,7 +123,7 @@ also capture `jstack` thread dumps for deeper state analysis.
 
 **Output layout (directory, not TOON file):**
 ```
-evidence/during/<variation>-<repeat>-<phase>-tsa/
+${HYPOTHETEST_EVIDENCE_DIR}/during/<variation>-<repeat>-<phase>-tsa/
   hot_threads_t0.txt
   hot_threads_t10.txt
   hot_threads_t20.txt
@@ -153,7 +153,7 @@ Like TSA, on-CPU produces archived data rather than time-series TOON rows.
 
 **Output layout (directory, not TOON file):**
 ```
-evidence/during/<variation>-<repeat>-<phase>-on_cpu/
+${HYPOTHETEST_EVIDENCE_DIR}/during/<variation>-<repeat>-<phase>-on_cpu/
   perf_t0.data
   perf_t0.txt
   perf_t10.data
@@ -183,7 +183,7 @@ classes (I/O, lock, sleep) from the captured stacks.
 
 **Output layout (directory, not TOON file):**
 ```
-evidence/during/<variation>-<repeat>-<phase>-off_cpu/
+${HYPOTHETEST_EVIDENCE_DIR}/during/<variation>-<repeat>-<phase>-off_cpu/
   offcpu_t0.txt
   offcpu_t10.txt
 ```
