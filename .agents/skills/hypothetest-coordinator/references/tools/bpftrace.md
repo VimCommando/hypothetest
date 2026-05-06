@@ -30,5 +30,12 @@ Verify bpftrace has sufficient privileges (CAP_BPF or root):
 sudo bpftrace -e 'BEGIN { exit(); }' 2>/dev/null
 ```
 
+## References
+
+- [bpftrace tools/](https://github.com/bpftrace/bpftrace/tree/master/tools) — ready-to-use scripts for CPU, I/O, memory, filesystem, and network tracing
+- [bpftrace one-liners tutorial](https://github.com/bpftrace/bpftrace/blob/master/docs/tutorial_one_liners.md)
+
 ## URL
-https://bpftrace.org/
+
+- https://bpftrace.org/
+- https://github.com/bpftrace/bpftrace

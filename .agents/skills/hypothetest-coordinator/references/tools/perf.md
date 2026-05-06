@@ -30,5 +30,12 @@ Verify perf has sufficient privileges (CAP_PERFMON or root):
 perf stat -e cycles true 2>/dev/null
 ```
 
+## References
+
+- [Brendan Gregg's perf examples](https://www.brendangregg.com/perf.html) — annotated examples for CPU profiling, flame graphs, and event tracing
+- [perf wiki tutorial](https://perf.wiki.kernel.org/index.php/Tutorial)
+
 ## URL
-https://perf.wiki.kernel.org/
+
+- https://perf.wiki.kernel.org/
+- https://github.com/torvalds/linux/tree/master/tools/perf

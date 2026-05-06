@@ -33,5 +33,11 @@ iostat -x 1 1 >/dev/null 2>&1
 mpstat 1 1 >/dev/null 2>&1
 ```
 
+## References
+
+- [iostat/mpstat/pidstat man pages](https://sysstat.github.io/documentation.html)
+
 ## URL
-https://sysstat.github.io/
+
+- https://sysstat.github.io/
+- https://github.com/sysstat/sysstat

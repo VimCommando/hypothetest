@@ -35,4 +35,6 @@ curl -sf "${ELASTICSEARCH_URL}/_cluster/health" -o /dev/null
 ```
 
 ## URL
-https://curl.se/
+
+- https://curl.se/
+- https://github.com/curl/curl

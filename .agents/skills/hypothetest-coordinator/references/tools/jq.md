@@ -35,4 +35,6 @@ echo '{"status":"green"}' | jq -r '.status'
 ```
 
 ## URL
-https://jqlang.github.io/jq/
+
+- https://jqlang.github.io/jq/
+- https://github.com/jqlang/jq
