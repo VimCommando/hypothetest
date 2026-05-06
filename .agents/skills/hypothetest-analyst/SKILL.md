@@ -376,3 +376,6 @@ observations into the analysis:
 - `references/metric-normalization.md`
 - `references/measurement-schema.md`
 - `references/index_template.yml`
+- `../../hypothetest-coordinator/references/observation-methods.md`
+  *(shared — Source of truth in Coordinator. Method catalog: collection shapes,
+  TOON output formats, output file layout, interpretation patterns.)*

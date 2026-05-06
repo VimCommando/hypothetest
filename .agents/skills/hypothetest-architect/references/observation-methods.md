@@ -1,8 +1,12 @@
-# Observation Methods
+# Observation Methods — Prescription Guide
 
 During-phase observation is opt-in. When the scenario warrants it, recommend
 `diagnostics.during` in the compiled plan. The user can accept, modify, or
 decline.
+
+For the full method catalog (packages, collection shapes, output formats,
+interpretation patterns), see the Coordinator-hosted reference.
+*(shared — Source of truth: `../../hypothetest-coordinator/references/observation-methods.md`)*
 
 ## When to recommend during-phase observation
 
@@ -15,72 +19,25 @@ decline.
 | Short phases (<15s) | no | skip — too few samples |
 | Simple A/B with clear scalar metric | no | boundary diagnostics sufficient |
 
-## Methods
+## Methods (summary)
 
-Each method prescribes packages, key signals, and an Analyst interpretation
-pattern.
-
-### `use` — Utilization, Saturation, Errors
-
-Investigates resource bottlenecks. The foundation method.
-
-- **Packages:** `elasticsearch_api`, `sysstat`, `procps`
-- **Key signals:** CPU util, disk I/O util, memory pressure, thread pool queue/rejected, GC frequency
-- **Analyst pattern:** saturated resource = limiter. Report per-variation×phase.
-- **Limiter taxonomy:** `cpu`, `memory`, `disk_io`, `network`, `gc_pressure`, `lock_contention`, `thread_pool_saturation`, `merge_throttle`, `app_internal`, `unknown`
-
-### `tsa` — Thread State Analysis
-
-Investigates where thread time goes.
-
-- **Packages:** `elasticsearch_api` (hot_threads), `jdk_tools` (jstack, jcmd)
-- **Key signals:** Execute, Runnable, Sleep, Lock, Idle fractions
-- **Analyst pattern:** flag any state >10% that isn't Execute or Idle
-
-### `off_cpu` — Off-CPU Analysis
-
-Investigates where threads block.
-
-- **Packages:** `bpftrace`, `perf`
-- **Key signals:** blocked-time stacks, I/O wait, lock wait, sleep wait
-- **Analyst pattern:** identify dominant wait class, correlate with USE saturation
-
-### `on_cpu` — On-CPU Analysis
-
-Investigates where CPU cycles go.
-
-- **Packages:** `perf`, `elasticsearch_api` (hot_threads)
-- **Key signals:** CPU flame graph top frames, IPC, branch misses
-- **Analyst pattern:** hot path identification, differential between variations
-
-### `latency` — Response Time Analysis
-
-Investigates response time distribution shape.
-
-- **Packages:** `elasticsearch_api`, `rally`, `bpftrace`
-- **Key signals:** p50, p90, p99, p99/p50 ratio, histogram shape
-- **Analyst pattern:** bimodal detection, moving modes, outlier fraction
-- **Schema effect:** auto-sets `shape: percentile_set` or `histogram` on relevant metrics
-
-### `drill_down` — Root Cause Drill-Down
-
-Not a during-phase method and not a pipeline artifact. This is an Analyst
-mental model: when a regression is identified, the Analyst narrows from
-system-level signals to the specific layer causing the issue. It does not
-appear in `diagnostics.during.methods`, has no `collect_drill_down`
-function, and produces no TOON files. It is purely an interpretation
-pattern the Analyst applies when writing the report.
+| Method | Investigates | Foundation packages |
+|---|---|---|
+| `use` | Resource bottlenecks (CPU, disk, memory, GC, thread pools) | `elasticsearch_api` + host tools |
+| `latency` | Response time distribution shape | `elasticsearch_api`, `rally` |
+| `tsa` | Thread state fractions | `elasticsearch_api` (hot_threads), `jdk_tools` |
+| `on_cpu` | CPU cycle attribution | `perf` (Linux only) |
+| `off_cpu` | Thread blocking attribution | `bpftrace` (Linux only) |
+| `drill_down` | Root cause narrowing | Not a during-phase method — Analyst interpretation pattern only |
 
 ## Profiles
 
-Named method combinations. Use as shorthand in `diagnostics.during.profile`.
-
-| Profile | Methods | Packages | Use when |
-|---|---|---|---|
-| `none` | — | — | Explicitly disable during-phase observation |
-| `light` | `use` (ES APIs only) | `elasticsearch_api` | Latency-sensitive; minimize observer effect |
-| `standard` | `use` (full) | `elasticsearch_api`, `sysstat`, `procps` | Default recommendation |
-| `comprehensive` | `use`, `tsa`, `latency`, `on_cpu` | all available | Deep investigation |
+| Profile | Methods | Use when |
+|---|---|---|
+| `none` | -- | Explicitly disable during-phase observation |
+| `light` | `use` (ES APIs only) | Latency-sensitive; minimize observer effect |
+| `standard` | `use` (full) | Default recommendation |
+| `comprehensive` | `use`, `tsa`, `latency`, `on_cpu` | Deep investigation |
 
 ## Prescription rules
 
@@ -130,21 +87,17 @@ diagnostics:
 ## Platform-aware prescription
 
 The Architect prescribes methods. The Coordinator discovers what packages are
-available. The Operator generates a script scoped to what's actually there.
+available. The Coordinator generates a script scoped to what's actually there.
 
 The Architect does not need to enumerate packages — prescribe the method and
-profile, and the Operator will use whatever the Coordinator verified. Only
-specify explicit packages when the user wants to **narrow** collection (e.g.,
-"only ES APIs, no host tools").
+profile, and the Coordinator will use whatever it verified. Only specify
+explicit packages when the user wants to **narrow** collection (e.g., "only
+ES APIs, no host tools").
 
-| Target | What the Operator gets | Typical profile |
+| Target | Available packages | Typical profile |
 |---|---|---|
 | `compose/local` (Linux) | ES APIs + sysstat + procps + maybe jdk_tools | `standard` |
 | `compose/local` (macOS) | ES APIs + darwin_tools (vm_stat, iostat) | `standard` |
 | `compose/remote` | ES APIs + remote host tools via SSH | `standard` |
 | `elastic-cloud` | ES APIs only | `light` |
 | `existing` | ES APIs + host tools if user declares access | `light` or `standard` |
-
-For `elastic-cloud` or restricted targets, recommend profile `light` —
-the Coordinator will report that only `elasticsearch_api` is verified, and
-the Operator will generate accordingly.
