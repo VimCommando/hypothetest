@@ -240,8 +240,13 @@ generated/
   scripts/
     evaluation.sh
   metrics-plan.yml
-  evaluation-guide.md
 ```
+
+The Architect produces `evaluation.sh` (deterministic task sequence compiled
+from the plan using `references/evaluation-template.sh` as the starting
+point). The Coordinator later adds environment-specific scripts
+(`compose-up.sh`, `reset.sh`, `load.sh`, `sample.sh`) and infrastructure
+assets (`compose/`, `eck/`) to the `generated/` directory.
 
 If creating Codex-ready repository content, use repo-scoped skills under `.agents/skills`.
 
@@ -325,8 +330,11 @@ Prescription rules:
 - Add explicit methods (`latency`, `on_cpu`, `tsa`) when the scenario warrants deeper investigation.
 - When the `latency` method is active, set `shape: percentile_set` on latency metrics.
 
-See `references/observation-methods.md` for the full method catalog, profiles,
-and prescription guidance.
+See `references/observation-methods.md` for prescription rules, profiles,
+and platform-aware guidance. The full method catalog (collection shapes,
+TOON formats, interpretation patterns) is in the Coordinator-hosted
+`observation-methods.md` — the Architect prescribes methods, the
+Coordinator resolves them to available packages.
 
 ## Validation checklist
 
