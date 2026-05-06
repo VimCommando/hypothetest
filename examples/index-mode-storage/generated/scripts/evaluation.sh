@@ -229,37 +229,41 @@ function generate_run_order() {
 
 # ----- Variation Configuration -----
 
-declare -A VARIATION_TEMPLATE=(
-    [standard]="templates/base-template.yml"
-    [logsdb]="templates/logsdb-template.yml"
-    [logsdb_synthetic_source]="templates/logsdb-synthetic-source-template.yml"
-    [standard_best_compression]="templates/standard-best-compression-template.yml"
-    [standard_best_compression_sorted]="templates/standard-best-compression-sorted-template.yml"
-)
+function variation_template() {
+    case "$1" in
+        standard)                         echo "templates/base-template.yml" ;;
+        logsdb)                           echo "templates/logsdb-template.yml" ;;
+        logsdb_synthetic_source)          echo "templates/logsdb-synthetic-source-template.yml" ;;
+        standard_best_compression)        echo "templates/standard-best-compression-template.yml" ;;
+        standard_best_compression_sorted) echo "templates/standard-best-compression-sorted-template.yml" ;;
+        *) log_error "Unknown variation: $1"; return 1 ;;
+    esac
+}
 
-declare -A VARIATION_TEMPLATE_NAME=(
-    [standard]="yelp-reviews-standard"
-    [logsdb]="yelp-reviews-logsdb"
-    [logsdb_synthetic_source]="yelp-reviews-logsdb-synthetic-source"
-    [standard_best_compression]="yelp-reviews-standard-best-compression"
-    [standard_best_compression_sorted]="yelp-reviews-standard-best-compression-sorted"
-)
+function variation_template_name() {
+    case "$1" in
+        standard)                         echo "yelp-reviews-standard" ;;
+        logsdb)                           echo "yelp-reviews-logsdb" ;;
+        logsdb_synthetic_source)          echo "yelp-reviews-logsdb-synthetic-source" ;;
+        standard_best_compression)        echo "yelp-reviews-standard-best-compression" ;;
+        standard_best_compression_sorted) echo "yelp-reviews-standard-best-compression-sorted" ;;
+        *) log_error "Unknown variation: $1"; return 1 ;;
+    esac
+}
 
-declare -A VARIATION_PIPELINE=(
-    [standard]=""
-    [logsdb]="templates/pipeline-date-to-timestamp.yml"
-    [logsdb_synthetic_source]="templates/pipeline-date-to-timestamp.yml"
-    [standard_best_compression]=""
-    [standard_best_compression_sorted]=""
-)
+function variation_pipeline() {
+    case "$1" in
+        logsdb|logsdb_synthetic_source) echo "templates/pipeline-date-to-timestamp.yml" ;;
+        *) ;;
+    esac
+}
 
-declare -A VARIATION_PIPELINE_NAME=(
-    [standard]=""
-    [logsdb]="yelp-reviews-date-to-timestamp"
-    [logsdb_synthetic_source]="yelp-reviews-date-to-timestamp"
-    [standard_best_compression]=""
-    [standard_best_compression_sorted]=""
-)
+function variation_pipeline_name() {
+    case "$1" in
+        logsdb|logsdb_synthetic_source) echo "yelp-reviews-date-to-timestamp" ;;
+        *) ;;
+    esac
+}
 
 # ----- Generated Task Functions -----
 
@@ -298,25 +302,30 @@ function do_reset() {
 
 function do_load_data() {
     local variation="$1" repeat="$2"
-    local template="${VARIATION_TEMPLATE[${variation}]}"
-    local template_name="${VARIATION_TEMPLATE_NAME[${variation}]}"
-    local pipeline="${VARIATION_PIPELINE[${variation}]}"
-    local pipeline_name="${VARIATION_PIPELINE_NAME[${variation}]}"
-
-    local -a loader_args=(
-        espipe
-        "datasets/yelp/yelp_academic_dataset_review.json"
-        "${ELASTICSEARCH_URL}/benchmark-index"
-        --template "${template}"
-        --template-name "${template_name}"
-        --batch-size 5000
-    )
+    local template pipeline pipeline_name
+    template="$(variation_template "${variation}")"
+    pipeline="$(variation_pipeline "${variation}")"
+    pipeline_name="$(variation_pipeline_name "${variation}")"
 
     if [[ -n "${pipeline}" ]]; then
-        loader_args+=(--pipeline "${pipeline}" --pipeline-name "${pipeline_name}")
+        run_cmd ./generated/scripts/load.sh "${variation}" "${repeat}" \
+            espipe \
+            "datasets/yelp/yelp_academic_dataset_review.json" \
+            "${ELASTICSEARCH_URL}/benchmark-index" \
+            --template "${template}" \
+            --template-name "$(variation_template_name "${variation}")" \
+            --batch-size 5000 \
+            --pipeline "${pipeline}" \
+            --pipeline-name "${pipeline_name}"
+    else
+        run_cmd ./generated/scripts/load.sh "${variation}" "${repeat}" \
+            espipe \
+            "datasets/yelp/yelp_academic_dataset_review.json" \
+            "${ELASTICSEARCH_URL}/benchmark-index" \
+            --template "${template}" \
+            --template-name "$(variation_template_name "${variation}")" \
+            --batch-size 5000
     fi
-
-    run_cmd ./generated/scripts/load.sh "${variation}" "${repeat}" "${loader_args[@]}"
 }
 
 function do_collect_diagnostics() {
@@ -387,7 +396,7 @@ function task_run_evaluation() {
 }
 
 function task_compare_results() {
-    log_info "Comparison: baseline=standard candidates=${VARIATIONS[*]:1}"
+    log_info "Comparison: baseline=standard candidates=logsdb,logsdb_synthetic_source,standard_best_compression,standard_best_compression_sorted"
     log_info "Method: bootstrap, alpha=0.05, correction=bonferroni"
     log_info "Effect thresholds: store_size>10%, throughput<20% degradation"
 }
