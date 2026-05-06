@@ -37,6 +37,8 @@ environment:
   scripts/
   diagnostics/
   generated/
+    scripts/
+      evaluation.sh
   checksums.yml
 ```
 
@@ -48,6 +50,7 @@ environment:
 - `scripts/`: allowlisted user-defined scripts used by benchmark phases.
 - `diagnostics/`: esdiag sources files and diagnostic collection plans.
 - `generated/`: deterministic Architect output, including compose files, evaluation guide, metrics plan, and generated runner assets.
+- `generated/scripts/evaluation.sh`: generated deterministic runner. It executes the compiled plan in order, uses named task functions for process control, and uses explicit parallel groups only when the plan permits concurrent work.
 
 ## Dataset Fixtures
 
@@ -97,6 +100,9 @@ include:
     - path: diagnostics/sources.yml
       kind: diagnostics
       format: yml
+    - path: generated/scripts/evaluation.sh
+      kind: generated
+      format: sh
 datasets:
   - name: docs-small
     path: data/docs.ndjson.gz
@@ -155,6 +161,7 @@ Raw esdiag diagnostics remain zipped esdiag bundles. Hypothetest structured eval
 - Include `checksums.yml` for local datasets, tracks, templates, and scripts when the blueprint is meant to be independently reproducible.
 - Include `blueprint.yml` for every blueprint and validate it against the Architect skill's bundled `schemas/blueprint.schema.yaml`.
 - Keep generated compose assets deterministic for the same `hypothetest.yml`.
+- Keep `generated/scripts/evaluation.sh` deterministic for the same `hypothetest.yml`; compile the task order into shell rather than making the script reinterpret YAML at runtime.
 - Use YAML/YML for Hypothetest configuration.
 - Store Hypothetest structured data as TOON.
 - Preserve esdiag raw diagnostics as `.zip` bundles.
