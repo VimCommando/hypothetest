@@ -1,6 +1,6 @@
 # index-mode-storage
 
-Compares on-disk storage size and indexing throughput across four Elasticsearch index mode and codec configurations using the Yelp Academic Dataset review corpus.
+Compares on-disk storage size and indexing throughput across five Elasticsearch index mode and codec configurations using the Yelp Academic Dataset review corpus.
 
 ## Variations
 
@@ -8,6 +8,7 @@ Compares on-disk storage size and indexing throughput across four Elasticsearch 
 |-----------|-----------|-------|------|
 | `standard` *(baseline)* | standard | LZ4 | none |
 | `logsdb` | logsdb | LZ4 | none |
+| `logsdb_synthetic_source` | logsdb | LZ4 | none |
 | `standard_best_compression` | standard | best_compression | none |
 | `standard_best_compression_sorted` | standard | best_compression | `business_id` asc |
 
@@ -52,7 +53,7 @@ generated/
 
 ## Expected Runtime
 
-~60 minutes (3 repeats × 4 variations)
+~75 minutes (3 repeats × 5 variations)
 
 ## Grade
 

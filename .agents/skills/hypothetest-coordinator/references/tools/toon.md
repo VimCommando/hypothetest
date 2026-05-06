@@ -25,5 +25,5 @@ echo 'status: ok' | toon validate -
 
 ## URL
 
-- https://github.com/toon-format/toon
+- https://github.com/JadJabbour/toon-rs
 - https://crates.io/crates/toon
