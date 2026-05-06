@@ -15,6 +15,8 @@ A Hypothetest `hypothesis.md` describes an experiment, not a fixed operation. It
 
 The Architect's final output is a blueprint. Like a civil engineer's blueprint, it should be precise enough that the Operator can follow it without reinterpreting the design intent, and portable enough that users can share it with each other.
 
+For execution, prefer deterministic generated shell over implicit orchestration. The Architect should compile the execution order into `generated/scripts/evaluation.sh` using the bundled `references/evaluation-template.sh` as the starting point.
+
 ## Inputs
 
 The hypothesis input is optional.
@@ -191,6 +193,24 @@ Use `shell` and `python` only when the hypothesis genuinely needs arbitrary loca
 
 Every phase must have a `name` and `tool`. Put tool-specific options under `with`.
 
+## Evaluation script template
+
+Every portable blueprint must include `generated/scripts/evaluation.sh`. Start from `references/evaluation-template.sh`, then replace the generated plan and task functions with the concrete evaluation compiled from `hypothetest.yml`.
+
+The script is the deterministic execution contract. It should:
+
+- Execute prerequisite checks, deployment setup, resets, data loading, workload phases, diagnostics, measurement export, comparison, and report generation in the declared order.
+- Use named task functions for each operation, with names derived from variation names, repeat numbers, phase names, and diagnostic collection points.
+- Use `run_task <name>` for serial work and `run_parallel <name>...` only for tasks that the hypothesis and measurement plan allow to run concurrently.
+- Preserve raw artifacts before summarizing them. Store phase logs, command output, esdiag bundles, measurements, comparisons, and reports under the evaluation directory created by the script.
+- Source an optional environment file for local credentials and machine-specific paths, but keep secrets out of blueprint manifests and generated scripts.
+- Use environment variables with defaults for paths and run metadata, including `HYPOTHETEST_PLAN`, `HYPOTHETEST_EVALUATION_ROOT`, `HYPOTHETEST_RUN_ID`, `HYPOTHETEST_DRY_RUN`, and `LOG_LEVEL`.
+- Keep shell logic explicit. Do not generate a script that infers phase order dynamically from YAML at runtime when the Architect can compile the order ahead of time.
+- Make parallel groups deterministic by starting the declared tasks in order and waiting/reporting results in that same order.
+- Be written with executable permissions when the output environment supports it; otherwise document `bash generated/scripts/evaluation.sh run` as the execution command.
+
+For multiple repeats, make repeat execution explicit in the generated plan. If the plan randomizes variation order, generate or require a recorded seed and write the resolved order into the evaluation artifacts before execution starts.
+
 ## Isolation requirement
 
 Always consider whether variation state could leak. Default to reset between variations unless the user explicitly opts out.
@@ -218,6 +238,7 @@ generated/
   compose/
   rally/
   scripts/
+    evaluation.sh
   metrics-plan.yml
   evaluation-guide.md
 ```
@@ -312,6 +333,9 @@ Before finalizing a blueprint:
 - Reports include Markdown and TOON unless the user says otherwise.
 - Baseline and candidate names match variation keys exactly.
 - Variation setup is explicit and does not depend on previous variations unless `evaluation.reset` says shared state is intentional.
+- `generated/scripts/evaluation.sh` exists for portable blueprints and matches the declared evaluation order.
+- Any generated parallel task group contains only independent collection or setup work and does not create measurement ambiguity.
+- The generated runner preserves raw artifacts before summaries, comparisons, or report generation.
 - Interpretation limits identify the workload, dataset, deployment, and Elasticsearch version scope.
 
 When schema-validating generated YAML, use the Rust `yaml-schema` package installed with `cargo install yaml-schema`. The installed CLI is `ys`; validate manifests with this skill's `schemas/blueprint.schema.yaml`. Validate `hypothetest.yml` with the Coordinator-owned `schemas/hypothetest.schema.yaml` when that skill is available. If `cargo` is unavailable, route the user to Coordinator setup before treating schema validation as complete.
@@ -326,3 +350,4 @@ Return concrete files or patches when possible. Avoid abstract brainstorming onc
 - `references/blueprint.md`
 - `references/compose-target.md`
 - `references/canonical-schema.md`
+- `references/evaluation-template.sh`
