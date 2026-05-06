@@ -9,6 +9,8 @@ You are the analyst for Hypothetest.
 
 Your job is to interpret completed or partial evaluation artifacts. Do not re-execute benchmarks unless explicitly asked. Preserve uncertainty and separate facts from interpretation.
 
+After the report artifacts are complete, create Kibana dashboards for the collected data when Kibana access is available. Use the Kibana dashboards skill at `/Users/reno/Development/elastic/agent-skills/skills/kibana/kibana-dashboards` for dashboard definitions, validation expectations, connection testing, and API operations.
+
 ## Input
 
 ```text
@@ -46,6 +48,7 @@ summary.toon
 comparison.toon
 charts/
 appendix/
+dashboards/
 ```
 
 Write outputs into the evaluation directory unless the user explicitly requests another destination.
@@ -62,6 +65,7 @@ Write outputs into the evaluation directory unless the user explicitly requests 
 8. Analyze secondary metrics only to explain or qualify primary findings.
 9. Identify outliers, failed phases, missing data, state leakage risks, runtime anomalies, and unresolved best-effort constants.
 10. Write a clear finding with caveats.
+11. After `report.md`, `summary.toon`, and `comparison.toon` are complete, prepare Kibana dashboard assets and deploy them when credentials are configured.
 
 If the evaluation is partial, analyze completed data but lead with missing or failed phases. Do not hide failed repeats in averages.
 
@@ -175,6 +179,7 @@ caveats[0]:
 artifacts:
   report: report.md
   comparison: comparison.toon
+  dashboards: dashboards/
 ```
 
 ## TOON output
@@ -192,6 +197,100 @@ Create or preserve normalized metric rows when available:
 metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
   example,evaluation-001,compose,baseline,1,warm_search,search_latency_p99,100,ms,rally,ok
 ```
+
+## Kibana dashboard workflow
+
+Use the `kibana-dashboards` skill after report compilation, in this order:
+
+1. Read `/Users/reno/Development/elastic/agent-skills/skills/kibana/kibana-dashboards/SKILL.md` before creating dashboard JSON.
+2. Identify which collected evidence is already queryable in Elasticsearch:
+   - Reuse `esdiag` results data streams when diagnostics were processed into a results cluster.
+   - Reuse any Rally, espipe, phase-output, or custom measurement indices already declared in `evaluation.yml` or `manifest.toon`.
+3. For Hypothetest measurements that are only local artifacts and not already indexed, create a custom evidence dataset before dashboard creation.
+4. Write generated dashboard definitions and ingestion assets under `dashboards/`.
+5. Test Kibana connectivity with the dashboard skill's required command before creating or updating dashboards.
+6. If the Kibana connection test fails, preserve the dashboard JSON and ingestion assets, explain the required environment variables in the report appendix or final response, and stop before attempting dashboard API writes.
+7. If the connection test succeeds, upsert dashboards with stable IDs derived from the evaluation id or scenario name and timestamp.
+
+Recommended dashboard outputs:
+
+```text
+dashboards/
+  README.md
+  hypothetest-overview.dashboard.json
+  hypothetest-diagnostics.dashboard.json
+  data/
+    measurements.ndjson
+  elasticsearch/
+    hypothetest-measurements-template.json
+    hypothetest-measurements-pipeline.json
+```
+
+Prefer inline ES|QL visualization panels in dashboard definitions. Build dense operational dashboards with primary KPIs and key trends above the fold. Use descriptive chart titles, no markdown header panels, and time ranges that cover the evaluation run.
+
+### Dashboard content
+
+Create an overview dashboard when normalized metrics or comparisons exist:
+
+- total runtime and per-variation runtime
+- primary metric baseline/candidate comparison
+- delta percent by metric, phase, and candidate
+- repeat-level metric distribution
+- failed, missing, or partial phase counts
+- confidence and caveat summary as data tables when represented as indexed fields
+
+Create a diagnostics dashboard when `esdiag` results data streams are available:
+
+- cluster, node, index, shard, segment, cache, snapshot, repository, and search/indexing diagnostics relevant to the scenario
+- diagnostic changes across variation, phase, repeat, and collection point
+- links or fields identifying the preserved raw `esdiag` bundles
+
+Do not duplicate `esdiag` documents into a custom Hypothetest index. Query the data streams produced by `esdiag process` directly.
+
+### Custom evidence indexing
+
+Only index custom Hypothetest evidence when the needed dashboard data is not already in `esdiag` results data streams or another declared Elasticsearch destination.
+
+Use `espipe` for custom ingestion. Provide:
+
+- an index template or composable template with correct field types for Kibana visualizations
+- an ingest pipeline when fields need parsing, normalization, unit conversion, timestamp assignment, or keyword copying
+- an NDJSON document file derived from normalized analysis artifacts, preserving links back to source artifacts
+
+Use a dedicated index or data stream pattern such as:
+
+```text
+hypothetest-measurements-*
+```
+
+Minimum custom measurement fields:
+
+```text
+@timestamp
+evaluation.id
+evaluation.scenario
+evaluation.started_at
+evaluation.completed_at
+deployment.target
+variation.name
+repeat.number
+phase.name
+metric.name
+metric.value
+metric.unit
+metric.source
+metric.status
+comparison.baseline
+comparison.candidate
+comparison.delta_absolute
+comparison.delta_percent
+confidence
+artifact.path
+```
+
+Map identifiers and labels as `keyword`, metric values and deltas as numeric types, timestamps as `date`, and long report text or caveats as `text` plus `.keyword` only when useful for grouping. Do not flatten semantically different measurements into the same metric name without a phase or dimension field.
+
+Record custom ingestion decisions in `dashboards/README.md`, including the target index or data stream, template path, pipeline path if any, source NDJSON path, espipe command used or recommended, and whether ingestion was actually executed.
 
 ## Interpretation guidance
 
