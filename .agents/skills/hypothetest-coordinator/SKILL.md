@@ -323,7 +323,31 @@ sample.sh — evaluation.sh calls phase commands directly.
 
 ### Progressive loading
 
-References are loaded based on deployment target and observation config:
+References are loaded based on deployment target, observation config,
+and blueprint declarations. Each tool reference is self-contained — load
+only the files relevant to the current blueprint.
+
+#### Tool references (`references/tools/`)
+
+**Always loaded:**
+- `references/tools/curl.md` — ES API access
+- `references/tools/ys.md` — schema validation
+- `references/tools/toon.md` — structured summary output
+
+**Loaded by blueprint condition:**
+- `references/tools/espipe.md` — when `dataset.loader: espipe`
+- `references/tools/esdiag.md` — when `measure.diagnostics.tool: esdiag`
+- `references/tools/rally.md` — when `dataset.loader: rally`
+- `references/tools/docker.md` — when `deployment.engine` resolves to `docker`
+- `references/tools/podman.md` — when `deployment.engine` resolves to `podman`
+- `references/tools/jq.md` — when `diagnostics.during` is declared
+
+**Loaded by prescribed method or profile:**
+- `references/tools/perf.md` — when `on_cpu` method is prescribed
+- `references/tools/bpftrace.md` — when `off_cpu` method is prescribed
+- `references/tools/sysstat.md` — when `standard` or `comprehensive` profile on Linux
+
+#### Generation references
 
 - **Always:** `references/script-templates.md` (skeleton, collection catalog)
 - **target: compose:** compose template references
