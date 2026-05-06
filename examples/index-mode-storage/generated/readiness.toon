@@ -3,6 +3,9 @@ checked: 2026-05-02
 deployment_target: compose/remote/podman
 dataset_loader: espipe
 diagnostics: esdiag
+os: linux
+observation_packages[1]{name,status,note}:
+  elasticsearch_api,verified,http://ironhide.local:9200
 
 blockers[0]:
 
@@ -28,5 +31,5 @@ required_before_operator[1]:
 operator_handoff:
   blueprint: blueprints/index-mode-storage/blueprint.yml
   scenario: blueprints/index-mode-storage/hypothetest.yml
-  evaluation_guide: blueprints/index-mode-storage/generated/evaluation-guide.md
+  evaluation: blueprints/index-mode-storage/generated/scripts/evaluation.sh
   readiness: blueprints/index-mode-storage/generated/readiness.md
