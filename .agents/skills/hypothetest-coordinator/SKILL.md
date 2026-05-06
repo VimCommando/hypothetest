@@ -1,13 +1,19 @@
 ---
 name: hypothetest-coordinator
-description: Prepare users and environments for Hypothetest blueprint execution. Use when the user needs first-time onboarding, credential discovery, local tool checks, deployment prerequisites, readiness verification, or a handoff between Architect and Operator before evaluating a blueprint or hypothetest.yml.
+description: Validate environments and generate environment-specific scripts for Hypothetest blueprint execution. Use when the user needs first-time onboarding, credential discovery, local tool checks, deployment prerequisites, readiness verification, environment-binding script generation, or a handoff between Architect and Operator.
 ---
 
 # Hypothetest Coordinator Skill
 
 You are the coordinator for Hypothetest.
 
-Your job is to make a blueprint evaluable by checking credentials, local tools, deployment prerequisites, dataset access, and handoff readiness. You act like a project coordinator, making sure dependencies and requirements are met before the work moves to the next phase. Do not design the benchmark question like the Architect, do not execute the benchmark like the Operator, and do not interpret results like the Analyst.
+Your job is to make a blueprint evaluable: validate the environment, then
+generate the environment-specific scripts that evaluation.sh calls. You act
+like a project coordinator who also provisions the site — checking that
+dependencies are met, then producing the infrastructure and observation
+scripts the Operator will run. Do not design the benchmark question like
+the Architect, do not execute the benchmark like the Operator, and do not
+interpret results like the Analyst.
 
 ## Role in the workflow
 
@@ -270,6 +276,61 @@ verified[3]:
 ```
 
 For remote compose with loader-local data, include a warning or verified note that the raw dataset is loaded through the indexing tool and is not staged to the SSH host.
+
+## Environment binding — script generation
+
+After readiness validation, generate the environment-specific scripts that
+evaluation.sh calls. This is template-stamping from readiness findings, not
+creative authoring — the Coordinator reads readiness.toon and the plan, then
+selects and fills patterns from the reference catalog.
+
+### Generated scripts
+
+| Script | Purpose | Reference |
+|---|---|---|
+| `generated/scripts/compose-up.sh` | Start cluster (compose target) | compose templates |
+| `generated/scripts/compose-down.sh` | Stop cluster (compose target) | compose templates |
+| `generated/scripts/sample.sh` | During-phase observation | `references/script-templates.md` |
+| `generated/scripts/reset.sh` | Variation reset (delete indices, clear caches) | calling convention contract |
+| `generated/scripts/load.sh` | Dataset loading wrapper | calling convention contract |
+
+Also generate `generated/compose/` (compose.yml, .env, elasticsearch.yml)
+or `generated/eck/` for the declared deployment target.
+
+### Script calling convention
+
+All generated scripts follow the locked calling convention contract
+(see design doc). Key conventions:
+
+- Stdout carries structured `[tag] key=value` lines
+- All artifact output paths use `HYPOTHETEST_*` env vars (absolute paths)
+- Scripts assume cwd is the blueprint root (set by evaluation.sh)
+- Scripts never prompt for input; missing credentials = non-zero exit
+- Scripts are idempotent where possible
+
+### sample.sh generation
+
+When `diagnostics.during` is declared and profile is not `none`:
+
+1. Read readiness.toon for platform, verified packages, jq availability
+2. Resolve profile to method set (see `references/observation-methods.md`)
+3. Select skeleton and collection functions from `references/script-templates.md`
+4. Fill in only verified-package collection logic; omit unverified packages
+5. Template `$ES_PID` resolution logic for the deployment target
+
+When `diagnostics.during` is absent or `profile: none`, do not generate
+sample.sh — evaluation.sh calls phase commands directly.
+
+### Progressive loading
+
+References are loaded based on deployment target and observation config:
+
+- **Always:** `references/script-templates.md` (skeleton, collection catalog)
+- **target: compose:** compose template references
+- **target: eck:** ECK template references (future, separate effort)
+- **diagnostics.during declared:** `references/observation-methods.md`
+
+Never load both compose and ECK reference sets simultaneously.
 
 ## Boundary rules
 
