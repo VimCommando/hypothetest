@@ -133,6 +133,7 @@ $defs:
       target:
         enum:
           - compose
+          - kubernetes
           - existing
           - elastic-cloud
       scope:
@@ -161,11 +162,21 @@ $defs:
             additionalProperties: true
           workdir:
             type: string
+      namespace:
+        type: string
+        minLength: 2
+        pattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
+        default: hypothetest
       elasticsearch:
         type: object
         additionalProperties: true
         properties:
           version:
+            type: string
+          nodes:
+            type: integer
+            minimum: 1
+          storage:
             type: string
           heap:
             type: string
@@ -179,6 +190,18 @@ $defs:
       repositories:
         type: object
         additionalProperties: true
+      kubernetes:
+        type: object
+        additionalProperties: true
+        properties:
+          provider:
+            enum:
+              - existing
+              - k3s
+          operator_version:
+            type: string
+          install_operator:
+            type: boolean
 
   dataset:
     type: object
