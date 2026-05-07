@@ -356,47 +356,34 @@ responses are always archived regardless of method.
 
 ## Evaluation Record
 
-Create `evaluation.yml` as the schema-valid index of the completed or partial
-evaluation. It must validate against this skill's bundled
-`schemas/evaluation.schema.yaml` and point
-to the preserved evidence, measurements, comparisons, report, summary, and
-charts.
+The runner generates `evaluation.yml` as the schema-valid index of the
+completed or partial evaluation. It must validate against this skill's
+bundled `schemas/evaluation.schema.yaml` and point to the preserved
+evidence and raw measurements.
 
-Record runtime explicitly. `manifest.runtime.total_seconds` is the elapsed wall-clock time from evaluation start to evaluation completion or failure. `manifest.runtime.variations` records each variation's elapsed wall-clock runtime, including repeat number when repeats are used. Compute variation runtime from the start of that variation's reset/provisioning through artifact archival for that variation/repeat, so loading, setup, phases, diagnostics, and archive cost are included.
+The runner records:
 
-Also create `manifest.toon` as the compact runtime manifest with:
+- `name`, `hypothesis`, `plan` — identity and source references
+- `manifest` — runtime metadata: start/end times, status, blueprint,
+  plan, variations list, repeats, quality label, and per-variation
+  runtime
+- `evidence` — paths to raw API responses, diagnostics, phase output
+- `measurements` — primary and secondary metric names; `normalized`
+  is left empty for the Analyst to populate
+- `comparisons` — baseline, candidates; `artifacts` and `decision`
+  are left empty for the Analyst to populate
 
-```toon
-scenario: name
-started_at: ISO-8601
-completed_at: null
-runtime_total_seconds: 0
-runtime_total_human: 0s
-deployment_target: compose
-engine: docker
-elasticsearch_version: version
-experiment_intent: compare_deployments
-variations[0]:
-variables[1]: deployment
-constants_required[2]: dataset,workload
-constants_best_effort[1]: index.primary_shards
-repeats: 3
-variation_runtime[1]{variation,repeat,seconds,human,status}:
-  baseline,1,120.5,2m 0.5s,complete
-artifacts[0]:
-```
+Record runtime explicitly. `manifest.runtime.total_seconds` is the
+elapsed wall-clock time from evaluation start to completion or failure.
+`manifest.runtime.variations` records each variation's elapsed
+wall-clock runtime. Compute variation runtime from the start of that
+variation's reset/provisioning through artifact archival, so loading,
+phases, diagnostics, and archive cost are included.
 
-Also include:
-
-- `evaluation_id`
-- `git_commit` when available
-- `started_by` when available
-- `phase_statuses`
-- `failures`
-- `commands`
-- `runtime.total_seconds`
-- `runtime.variations`
-- `result_quality`
+The Operator does not produce `manifest.toon`, `summary.toon`,
+`comparison.toon`, normalized measurements, charts, or `report.md`.
+Those are Analyst deliverables produced after consuming the runner
+output.
 
 ## Failure behavior
 
