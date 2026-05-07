@@ -145,6 +145,10 @@ function write_partial_evaluation() {
         return 0
     fi
     local eval_file="${HYPOTHETEST_EVALUATION_DIR}/evaluation.yml"
+    if [[ -f "${eval_file}" ]] && grep -q 'status: complete' "${eval_file}" 2>/dev/null; then
+        log_warn "Completed evaluation.yml exists, not overwriting with partial"
+        return 0
+    fi
     local fail_time
     fail_time="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     local total_seconds=0
@@ -218,6 +222,14 @@ EOF
             done
         done
         echo "  generated: []"
+        echo "measurements:"
+        echo "  normalized: []"
+        echo "  primary: []"
+        echo "  secondary: []"
+        echo "comparisons:"
+        echo "  artifacts: []"
+        echo "  baseline: default-heap"
+        echo "  candidates: []"
     } > "${eval_file}"
 
     ${_prev_nullglob}
@@ -411,13 +423,6 @@ function task_validate_prerequisites() {
     command -v jq >/dev/null || { log_error "jq not found"; return 1; }
     command -v kubectl >/dev/null || { log_error "kubectl not found"; return 1; }
     test -f "${HYPOTHETEST_PLAN}" || { log_error "Plan file missing: ${HYPOTHETEST_PLAN}"; return 1; }
-
-    if [[ ! -f "${blueprint_root}/generated/readiness.toon" ]]; then
-        log_warn "Coordinator readiness evidence not found (generated/readiness.toon)"
-        log_warn "  Tool versions, credentials, dataset access, and deployment"
-        log_warn "  prerequisites have not been verified by the Coordinator."
-        log_warn "  Run the Coordinator to generate readiness evidence."
-    fi
 
     for v in "${VARIATIONS[@]}"; do
         local overlay_dir="${blueprint_root}/generated/eck/overlays/${v}"
@@ -727,6 +732,15 @@ VARIATION_TIMINGS_FILE=""
 function command_run() {
     cd "${blueprint_root}"
     EVAL_START_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    ensure_directories
+
+    if [[ ! -f "${blueprint_root}/generated/readiness.toon" ]]; then
+        log_warn "Coordinator readiness evidence not found (generated/readiness.toon)"
+        log_warn "  Tool versions, credentials, dataset access, and deployment"
+        log_warn "  prerequisites have not been verified by the Coordinator."
+        log_warn "  Run the Coordinator to generate readiness evidence."
+    fi
+
     run_task validate_prerequisites
     run_task prepare_workspace
     run_task eck_up
