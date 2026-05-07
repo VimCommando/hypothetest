@@ -23,7 +23,7 @@ Accept a candidate if its post-force-merge store size is **>10% smaller** than `
 - Podman on the remote host (`ironhide.local` in `~/.ssh/config`)
 - SSH certificate access to the remote host
 - `espipe` >= 0.3.0 and `esdiag` on PATH
-- Yelp review corpus at `datasets/yelp/yelp_academic_dataset_review.json` on the remote host
+- Yelp review corpus at `datasets/yelp/yelp_academic_dataset_review.json` on the operator machine (the loader runs locally and pushes to the remote endpoint)
 
 ## Evaluation
 
