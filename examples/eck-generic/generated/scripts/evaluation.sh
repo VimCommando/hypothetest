@@ -139,13 +139,100 @@ function print_env() {
 
 declare current_task=""
 
+function write_partial_evaluation() {
+    local failed_task="$1" exit_code="$2"
+    if [[ -z "${HYPOTHETEST_EVALUATION_DIR:-}" || ! -d "${HYPOTHETEST_EVALUATION_DIR}" ]]; then
+        return 0
+    fi
+    local eval_file="${HYPOTHETEST_EVALUATION_DIR}/evaluation.yml"
+    local fail_time
+    fail_time="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    local total_seconds=0
+    if [[ -n "${EVAL_START_TIME:-}" ]]; then
+        local start_epoch end_epoch
+        start_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${EVAL_START_TIME}" +%s 2>/dev/null || date -d "${EVAL_START_TIME}" +%s 2>/dev/null || echo 0)"
+        end_epoch="$(date +%s)"
+        total_seconds=$(( end_epoch - start_epoch ))
+    fi
+
+    local _prev_nullglob
+    _prev_nullglob=$(shopt -p nullglob) || true
+    shopt -s nullglob
+
+    {
+        cat <<EOF
+name: eck-generic-ingest
+evaluation_id: ${HYPOTHETEST_RUN_ID}
+hypothesis: hypothesis.md
+plan: hypothetest.yml
+manifest:
+  started_at: "${EVAL_START_TIME:-${fail_time}}"
+  completed_at: "${fail_time}"
+  status: failed
+  blueprint: blueprint.yml
+  plan: hypothetest.yml
+  quality: incomplete
+  variations:
+EOF
+        for v in "${VARIATIONS[@]}"; do
+            echo "    - ${v}"
+        done
+        cat <<EOF
+  repeats: ${REPEATS}
+  runtime:
+    total_seconds: ${total_seconds}
+    variations: []
+  failures:
+    - "${failed_task}: exit ${exit_code}"
+evidence:
+  raw:
+EOF
+        for v in "${VARIATIONS[@]}"; do
+            for (( r=1; r<=REPEATS; r++ )); do
+                for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*; do
+                    echo "    - path: measurements/${v}/${r}/$(basename "$f")"
+                    echo "      kind: measurement"
+                    echo "      format: ${f##*.}"
+                done
+            done
+        done
+        echo "  diagnostics:"
+        for v in "${VARIATIONS[@]}"; do
+            for (( r=1; r<=REPEATS; r++ )); do
+                for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
+                    echo "    - path: evidence/diagnostics/${v}/${r}/$(basename "$f")"
+                    echo "      kind: diagnostic"
+                    echo "      format: zip"
+                done
+            done
+        done
+        echo "  phase_output:"
+        for v in "${VARIATIONS[@]}"; do
+            for (( r=1; r<=REPEATS; r++ )); do
+                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
+                    local bname="${f##*/}" ext="${f##*.}"
+                    echo "    - path: evidence/phase-output/${v}/${r}/${bname}"
+                    echo "      kind: phase_output"
+                    echo "      format: ${ext}"
+                done
+            done
+        done
+        echo "  generated: []"
+    } > "${eval_file}"
+
+    ${_prev_nullglob}
+    log_warn "Partial evaluation index written to $(cyan "${eval_file}")"
+}
+
 function on_error() {
     local status=$?
+    local failed_task="${current_task:-unknown}"
     if [[ -n ${current_task} ]]; then
         log_error "Task $(magenta "${current_task}") failed with exit status ${status}"
     else
         log_error "Evaluation failed with exit status ${status}"
     fi
+    write_partial_evaluation "${failed_task}" "${status}"
     exit "${status}"
 }
 

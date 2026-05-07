@@ -387,12 +387,13 @@ output.
 
 ## Failure behavior
 
-If a phase fails:
+The generated runner writes a partial `evaluation.yml` on failure via an
+ERR trap. The partial index records:
 
-1. Preserve logs and partial metrics.
-2. Mark the variation/repeat/phase as failed.
-3. Continue only if the scenario says `continue_on_error: true`.
-4. Write a clear failure summary.
+- `manifest.status: failed` and `manifest.quality: incomplete`
+- `manifest.failures` with the failed task name and exit code
+- Whatever evidence artifacts (raw measurements, diagnostics, phase output)
+  existed at the time of failure
 
 If diagnostics collection fails, preserve deployment state and raw evidence before teardown whenever that state is needed to recover primary metrics or explain the failure. Do not delete volumes or otherwise destroy the only remaining source of required metrics after a diagnostics credential or access failure unless the scenario explicitly says cleanup is more important than recoverability.
 
