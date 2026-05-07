@@ -49,7 +49,7 @@ deployment:
   target: kubernetes
   namespace: hypothetest
   elasticsearch:
-    version: 9.0.0
+    version: 9.4.0
     nodes: 1
     storage: 10Gi
     security: false
@@ -192,7 +192,7 @@ compare:
 Results apply only to:
 
 - **Workload**: bulk-load of a generic NDJSON corpus via espipe, single-shard, no replicas, no concurrent search.
-- **Deployment**: single-node Elasticsearch 9.0.0 managed by ECK on Kubernetes (k3s or lightweight Kubernetes, `vm.max_map_count=1048576` via privileged initContainer).
+- **Deployment**: single-node Elasticsearch 9.4.0 managed by ECK on Kubernetes (k3s or lightweight Kubernetes, `vm.max_map_count=1048576` via privileged initContainer).
 - **Heap caveat**: increasing heap from 2g to 4g also requires increasing container memory limits from 4g to 8g. The comparison conflates JVM heap headroom with total available memory. A more controlled experiment would hold container memory constant, but 4g heap in a 4g container is not viable.
 - **Interpretation limit**: a >10% throughput improvement is the declared practical threshold. Smaller improvements are not operationally meaningful for this experiment.
 - **Generalization**: conclusions should not be used for production capacity planning without re-evaluating on representative infrastructure and storage configuration.

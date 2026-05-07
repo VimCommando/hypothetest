@@ -4,7 +4,7 @@ metadata:
   name: hypothetest
   namespace: hypothetest
 spec:
-  version: 9.0.0
+  version: 9.4.0
   http:
     tls:
       selfSignedCertificate:

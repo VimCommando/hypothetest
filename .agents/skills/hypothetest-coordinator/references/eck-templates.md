@@ -35,7 +35,7 @@ deployment:
   target: kubernetes
   namespace: hypothetest
   elasticsearch:
-    version: 9.0.0
+    version: 9.4.0
     nodes: 1
     storage: 10Gi
     security: false
@@ -158,7 +158,7 @@ metadata:
   name: hypothetest
   namespace: hypothetest
 spec:
-  version: 9.0.0
+  version: 9.4.0
   http:
     tls:
       selfSignedCertificate:
@@ -242,7 +242,7 @@ metadata:
   name: hypothetest
   namespace: hypothetest
 spec:
-  version: 9.0.0
+  version: 9.4.0
   nodeSets:
   - name: default
     count: 1
@@ -296,7 +296,7 @@ metadata:
   name: hypothetest
   namespace: hypothetest
 spec:
-  version: 9.0.0
+  version: 9.4.0
   nodeSets:
   - name: default
     count: 3
@@ -363,7 +363,7 @@ metadata:
   name: hypothetest
   namespace: hypothetest
 spec:
-  version: 9.0.0
+  version: 9.4.0
   nodeSets:
   - name: hot
     count: 2
@@ -439,7 +439,7 @@ metadata:
   name: hypothetest
   namespace: hypothetest
 spec:
-  version: 9.0.0
+  version: 9.4.0
   count: 1
   elasticsearchRef:
     name: hypothetest

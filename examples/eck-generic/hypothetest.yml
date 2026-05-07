@@ -32,7 +32,7 @@ deployment:
   target: kubernetes
   namespace: hypothetest
   elasticsearch:
-    version: 9.0.0
+    version: 9.4.0
     nodes: 1
     storage: 10Gi
     security: false
@@ -180,7 +180,7 @@ report:
     - charts
   limits: >
     Results apply only to bulk-load via espipe on a single-node ECK-managed
-    Elasticsearch 9.0.0 cluster on k3s or lightweight Kubernetes with
+    Elasticsearch 9.4.0 cluster on k3s or lightweight Kubernetes with
     vm.max_map_count=1048576 set via privileged initContainer.
     Heap increase also requires doubling container memory limits; the
     comparison conflates heap headroom with total available memory.
