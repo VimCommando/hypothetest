@@ -21,20 +21,23 @@ primary_metrics:
   - name: indexing_throughput_docs_per_sec
     description: >
       Documents indexed per second during the espipe bulk load phase.
-      Reported by espipe stdout/output artifact.
+      The runner captures espipe's raw stdout to espipe_output.json.
+      The format of this file depends on espipe's output mode — it may
+      be structured JSON or human-readable text. The Analyst is
+      responsible for parsing and normalizing the throughput value.
     unit: docs/sec
     source: espipe
     collection_point: load_data phase output
     extraction_path: docs_per_second
     phase: load_data
     artifact: espipe_output.json
-    status: resolved
+    status: raw_capture
     note: >
-      espipe must emit structured output (JSON) for this field to be
-      machine-readable. If espipe only emits human-readable stdout, the
-      Operator must parse it with a shell script and record the value
-      in a phase artifact. Mark as unresolved if espipe output format
-      is not confirmed before execution.
+      The runner captures espipe stdout verbatim. If espipe emits JSON
+      with a docs_per_second field, extraction is direct. If espipe
+      emits human-readable output, the Analyst must parse the throughput
+      value from the raw capture. Confirm espipe output format before
+      relying on extraction_path.
 
 secondary_metrics:
 
