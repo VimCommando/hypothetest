@@ -265,10 +265,17 @@ function apply_variation() {
 }
 
 function ensure_port_forward() {
-    local pf_pidfile="${HYPOTHETEST_EVALUATION_ROOT:-.}/port-forward.pid"
     local pf_pid=""
-    if [[ -f "${pf_pidfile}" ]]; then
-        pf_pid=$(cat "${pf_pidfile}")
+    local pf_pidfile=""
+    for candidate in "./port-forward.pid" "${HYPOTHETEST_EVALUATION_ROOT:-.}/port-forward.pid"; do
+        if [[ -f "${candidate}" ]]; then
+            pf_pidfile="${candidate}"
+            pf_pid=$(cat "${candidate}")
+            break
+        fi
+    done
+    if [[ -z "${pf_pidfile}" ]]; then
+        pf_pidfile="${HYPOTHETEST_EVALUATION_ROOT:-.}/port-forward.pid"
     fi
 
     if [[ -n "${pf_pid}" ]] && kill -0 "${pf_pid}" 2>/dev/null; then

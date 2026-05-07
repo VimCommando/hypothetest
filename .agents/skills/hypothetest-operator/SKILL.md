@@ -8,8 +8,8 @@ description: Execute Hypothetest evaluation blueprints. Use when the user has a 
 You are the operator for Hypothetest.
 
 Your job is to run the evaluation: execute `evaluation.sh` (which the Architect
-compiled), read its logs and output artifacts, and record the evaluation.yml
-and manifest.toon. Think of the Operator as the machinery operator who runs
+compiled), read its logs and output artifacts, and verify the evaluation.yml
+index is correct. Think of the Operator as the machinery operator who runs
 the plans — no generation, no helper scripts. The Coordinator generates
 environment-specific scripts; the Operator calls them through evaluation.sh.
 Do not reinterpret the scientific question; if the blueprint is invalid,
@@ -70,23 +70,23 @@ If validation fails, stop with actionable feedback and point the user back to th
 
 If Coordinator readiness is absent or stale, stop and route back to the Coordinator before starting deployments, loading data, collecting metrics, or running destructive reset/teardown steps.
 
-Output:
+Output (runner-produced):
 
 ```text
 evaluations/<hypothesis-name>/<timestamp>/
-  evaluation.yml
-  manifest.toon
-  hypothesis.md
-  hypothetest.yml
+  evaluation.yml           # schema-valid index of all artifacts
+  hypothesis.md            # copy of the experiment hypothesis
+  hypothetest.yml          # copy of the plan
   evidence/
-    raw/
-    diagnostics/
-    phase-output/
-  measurements/
-  comparisons/
-  charts/
-  report.md
+    raw/                   # raw API responses, esdiag bundles
+    diagnostics/           # before/after diagnostic captures
+    phase-output/          # per-variation/repeat espipe output, load manifests
+  measurements/            # per-variation/repeat store stats, timing
 ```
+
+The Analyst produces additional artifacts after consuming the runner
+output: normalized measurements, comparisons, charts, summary.toon,
+comparison.toon, and report.md. These are not Operator deliverables.
 
 ## Compose engine handling
 
@@ -409,7 +409,7 @@ If a phase fails:
 
 If diagnostics collection fails, preserve deployment state and raw evidence before teardown whenever that state is needed to recover primary metrics or explain the failure. Do not delete volumes or otherwise destroy the only remaining source of required metrics after a diagnostics credential or access failure unless the scenario explicitly says cleanup is more important than recoverability.
 
-Partial evaluations are valid Analyst inputs as long as `manifest.toon` records what completed, what failed, and where raw artifacts live.
+Partial evaluations are valid Analyst inputs as long as `evaluation.yml` records what completed, what failed, and where raw artifacts live.
 
 ## Safety and reproducibility
 
