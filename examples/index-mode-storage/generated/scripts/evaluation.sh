@@ -291,6 +291,8 @@ function task_validate_prerequisites() {
 function task_prepare_workspace() {
     ensure_directories
     cp "${HYPOTHETEST_PLAN}" "${HYPOTHETEST_EVALUATION_DIR}/hypothetest.yml"
+    cp "${blueprint_root}/hypothesis.md" "${HYPOTHETEST_EVALUATION_DIR}/hypothesis.md"
+    cp "${blueprint_root}/blueprint.yml" "${HYPOTHETEST_EVALUATION_DIR}/blueprint.yml"
     print_env > "${HYPOTHETEST_EVALUATION_DIR}/evaluation.env"
 
     generate_run_order
@@ -476,9 +478,22 @@ EOF
         cat <<EOF
   failures: []
 evidence:
-  raw: []
-  diagnostics:
+  raw:
 EOF
+        for v in "${VARIATIONS[@]}"; do
+            for (( r=1; r<=REPEATS; r++ )); do
+                for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*; do
+                    local bname ext
+                    bname="$(basename "$f")"
+                    ext="${bname##*.}"
+                    echo "    - path: measurements/${v}/${r}/${bname}"
+                    echo "      kind: measurement"
+                    echo "      format: ${ext}"
+                done
+            done
+        done
+
+        echo "  diagnostics:"
         for v in "${VARIATIONS[@]}"; do
             for (( r=1; r<=REPEATS; r++ )); do
                 for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
