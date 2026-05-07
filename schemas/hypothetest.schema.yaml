@@ -227,6 +227,11 @@ $defs:
         type: string
       target:
         type: string
+      locality:
+        enum:
+          - operator-local
+          - remote-host
+        default: operator-local
       track:
         type: string
       challenge:

@@ -54,13 +54,15 @@ dataset:
   loader: espipe
   input: datasets/yelp/yelp_academic_dataset_review.json
   target: per-variation
+  locality: operator-local
   options:
     batch_size: 5000
   fixture:
     description: >
       Yelp Academic Dataset review corpus. Must be present at the declared
-      path on the remote host before execution. Coordinator must verify file
-      existence and readability before the Operator executes the evaluation.
+      path on the operator machine before execution. The loader runs locally
+      and pushes documents to the remote Elasticsearch endpoint. Coordinator
+      must verify file existence and readability before the Operator executes.
 
 variations:
   standard:
