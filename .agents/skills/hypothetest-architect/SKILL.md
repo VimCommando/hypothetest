@@ -78,6 +78,11 @@ Target order:
 
 Prefer `compose` unless the user explicitly asks for another target.
 
+When `elasticsearch.version` is `latest` or omitted, resolve to the
+current stable Elasticsearch release and surface it to the user before
+proceeding. The user may need a specific version for compatibility
+testing, regression work, or to match a production deployment.
+
 ## Compose defaults
 
 When target is `compose`, use these defaults unless overridden:
@@ -88,7 +93,7 @@ deployment:
   scope: local
   engine: auto
   elasticsearch:
-    version: 8.18.0
+    version: latest
     nodes: 1
     security: false
     heap: 2g
@@ -134,7 +139,7 @@ deployment:
   target: kubernetes
   namespace: hypothetest
   elasticsearch:
-    version: 9.0.0
+    version: latest
     nodes: 1
     storage: 10Gi
     security: false

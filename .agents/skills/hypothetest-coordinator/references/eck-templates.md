@@ -49,7 +49,10 @@ deployment:
 ```
 
 Generation rules:
-- All versions come from the blueprint declaration — never hardcode
+- When `deployment.elasticsearch.version` is omitted, default to the
+  latest stable Elasticsearch release. Surface the chosen version to the
+  user and confirm before generating — they may need a specific version
+  for compatibility or regression testing
 - Generate manifests only for declared services (skip Kibana CRD when `services.kibana: false`)
 - Namespace comes from `deployment.namespace` (default: `hypothetest`)
 - When `security: false`, disable TLS and create a plaintext HTTP service
