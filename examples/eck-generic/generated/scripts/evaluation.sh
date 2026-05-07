@@ -401,17 +401,17 @@ function task_validate_prerequisites() {
     command -v kubectl >/dev/null || { log_error "kubectl not found"; return 1; }
     test -f "${HYPOTHETEST_PLAN}" || { log_error "Plan file missing: ${HYPOTHETEST_PLAN}"; return 1; }
 
-    if ! kubectl get elasticsearch "${CLUSTER_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
-        log_error "Elasticsearch CRD not found — run eck-up.sh first"
-        return 1
+    if [[ ! -f "${blueprint_root}/generated/readiness.toon" ]]; then
+        log_warn "Coordinator readiness evidence not found (generated/readiness.toon)"
+        log_warn "  Tool versions, credentials, dataset access, and deployment"
+        log_warn "  prerequisites have not been verified by the Coordinator."
+        log_warn "  Run the Coordinator to generate readiness evidence."
     fi
 
-    local health
-    health=$(curl -sf "${ELASTICSEARCH_URL}/_cluster/health" 2>/dev/null) || {
-        log_error "Cannot reach Elasticsearch at ${ELASTICSEARCH_URL} — is port-forward running?"
-        return 1
-    }
-    log_info "Cluster reachable at $(cyan "${ELASTICSEARCH_URL}")"
+    for v in "${VARIATIONS[@]}"; do
+        local overlay_dir="${blueprint_root}/generated/eck/overlays/${v}"
+        test -d "${overlay_dir}" || { log_error "Kustomize overlay missing: ${overlay_dir}"; return 1; }
+    done
 }
 
 function task_prepare_workspace() {

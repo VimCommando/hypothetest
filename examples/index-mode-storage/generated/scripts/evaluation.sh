@@ -363,6 +363,13 @@ function task_validate_prerequisites() {
     command -v jq >/dev/null || { log_error "jq not found"; return 1; }
     test -f "${HYPOTHETEST_PLAN}" || { log_error "Plan file missing: ${HYPOTHETEST_PLAN}"; return 1; }
 
+    if [[ ! -f "${blueprint_root}/generated/readiness.toon" ]]; then
+        log_warn "Coordinator readiness evidence not found (generated/readiness.toon)"
+        log_warn "  Tool versions, credentials, dataset access, and deployment"
+        log_warn "  prerequisites have not been verified by the Coordinator."
+        log_warn "  Run the Coordinator to generate readiness evidence."
+    fi
+
     local license_type
     license_type=$(curl -sf "${ELASTICSEARCH_URL}/_license" | grep -o '"type":"[^"]*"' | cut -d'"' -f4) || true
     case "${license_type}" in

@@ -56,7 +56,7 @@ use the Coordinator-owned schema to validate input `hypothetest.yml`.
 Before generating or executing anything, validate that:
 
 - YAML schema validation succeeds with `ys`, installed via `cargo install yaml-schema`; if `cargo` or `ys` is unavailable, route to Coordinator setup.
-- Coordinator readiness evidence is present for scenario-required tools, credentials, access preflights, dataset access, and deployment prerequisites. Do not proceed from tool availability alone.
+- Coordinator readiness evidence (`generated/readiness.toon`) is checked. If absent, the runner warns that tool versions, credentials, dataset access, and deployment prerequisites have not been verified. Execution continues — this is an informed-consent warning, not a hard gate.
 - `deployment.target` is supported.
 - `dataset.loader` is `rally` or `espipe`.
 - `variations` contains at least two entries.
@@ -68,7 +68,7 @@ Before generating or executing anything, validate that:
 
 If validation fails, stop with actionable feedback and point the user back to the Architect. Do not infer or invent missing blueprint or scenario intent.
 
-If Coordinator readiness is absent or stale, stop and route back to the Coordinator before starting deployments, loading data, collecting metrics, or running destructive reset/teardown steps.
+If Coordinator readiness is absent or stale, the runner warns the user and continues. The warning explains what has not been verified and suggests running the Coordinator to generate readiness evidence.
 
 Output (runner-produced):
 
