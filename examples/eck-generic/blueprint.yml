@@ -4,6 +4,7 @@ description: Generic Kubernetes (ECK) target example comparing ingest throughput
 hypothesis: hypothesis.md
 plan: hypothetest.yml
 readme: README.md
+status: requires-external-dataset
 self_contained: false
 expected_runtime: 30m
 prerequisites:

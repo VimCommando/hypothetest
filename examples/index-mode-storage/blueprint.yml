@@ -3,6 +3,7 @@ owner: storage
 hypothesis: hypothesis.md
 plan: hypothetest.yml
 readme: README.md
+status: requires-external-dataset
 self_contained: false
 expected_runtime: 60m
 prerequisites:

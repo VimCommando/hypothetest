@@ -26,6 +26,13 @@ properties:
     $ref: "#/$defs/path"
   readme:
     $ref: "#/$defs/path"
+  status:
+    type: string
+    enum:
+      - runnable
+      - requires-external-dataset
+      - design-sketch
+    default: design-sketch
   expected_runtime:
     type: string
   prerequisites:

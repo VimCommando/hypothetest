@@ -1,5 +1,7 @@
 # index-mode-storage
 
+> **Status:** requires-external-dataset — Yelp review corpus must be provided before execution.
+
 Compares on-disk storage size and indexing throughput across five Elasticsearch index mode and codec configurations using the Yelp Academic Dataset review corpus.
 
 ## Variations

@@ -1,5 +1,7 @@
 # eck-generic-ingest
 
+> **Status:** requires-external-dataset — NDJSON corpus at `data/docs.ndjson` must be provided before execution.
+
 Generic Kubernetes (ECK) deployment target example. Compares bulk ingest throughput between two JVM heap configurations on a single-node ECK-managed Elasticsearch cluster.
 
 ## Variations
@@ -26,24 +28,17 @@ Accept the candidate if indexing throughput is **>10% higher** than the baseline
 # Optional: provision a local k3s cluster
 bash generated/scripts/k3s-install.sh
 
-# Deploy Elasticsearch via ECK (applies default-heap overlay, starts port-forward)
-bash generated/scripts/eck-up.sh
-
-# Run the evaluation (2 variations x 3 repeats, randomized)
-# Applies kustomize overlays between variations, waits for cluster health
+# Run the evaluation (deploys ECK, 2 variations x 3 repeats, tears down)
 bash generated/scripts/evaluation.sh run
 
 # Dry-run to preview the plan without executing
 bash generated/scripts/evaluation.sh plan
 
-# After evaluation, tear down
-bash generated/scripts/eck-down.sh
-
 # Optional: remove k3s
 bash generated/scripts/k3s-uninstall.sh
 ```
 
-The evaluation runner applies `kubectl apply -k generated/eck/overlays/<variation>` before each variation's repeats, then waits for the cluster to reach green health before proceeding. Artifacts are captured per variation/repeat.
+The evaluation runner owns the full lifecycle: `eck_up` deploys the ECK operator and baseline Elasticsearch cluster, the evaluation loop applies `kubectl apply -k generated/eck/overlays/<variation>` before each variation's repeats, and `eck_down` tears down the cluster. Artifacts are captured per variation/repeat.
 
 ## Files
 
