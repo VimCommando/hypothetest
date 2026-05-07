@@ -141,11 +141,12 @@ CRDs so the target namespace exists.
 
 ## Elasticsearch CRD patterns
 
-### Single-node, security disabled (dev-grade)
+### Single-node, security disabled
 
-Minimal configuration for local iteration. Disables TLS and security,
-uses `node.store.allow_mmap: false` for environments without vm.max_map_count
-tuning.
+Disables TLS and security. Uses a privileged initContainer to set
+`vm.max_map_count=1048576` — required for benchmark-grade mmap
+performance. Never use `node.store.allow_mmap: false` for benchmarks;
+it disables memory mapping and degrades I/O throughput.
 
 ```yaml
 apiVersion: elasticsearch.k8s.elastic.co/v1
@@ -163,12 +164,17 @@ spec:
   - name: default
     count: 1
     config:
-      node.store.allow_mmap: false
       xpack.security.enabled: false
       xpack.security.http.ssl.enabled: false
       xpack.security.transport.ssl.enabled: false
     podTemplate:
       spec:
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=1048576']
         containers:
         - name: elasticsearch
           env:
@@ -199,21 +205,13 @@ Adaptation points:
 - When `deployment.elasticsearch.storage` is omitted, omit the
   `volumeClaimTemplates` block entirely (ECK defaults to 1Gi emptyDir-like PVC)
 
-### vm.max_map_count — initContainer vs allow_mmap
+### vm.max_map_count — initContainer
 
-Two approaches for the `vm.max_map_count` kernel setting that
-Elasticsearch requires:
-
-**Option A: `node.store.allow_mmap: false`** (dev-grade default)
-
-Avoids the kernel setting entirely. Performance impact — suitable for
-development and functional testing, not benchmark-grade results.
-
-**Option B: privileged initContainer** (benchmark-grade)
-
-Sets the kernel parameter at pod startup. Use when readiness.toon reports
-`vm_max_map_count: unverified` and the experiment needs benchmark-grade
-performance:
+Elasticsearch requires `vm.max_map_count=1048576` (ES 8.16+). Always
+use a privileged initContainer to set this kernel parameter at pod
+startup. For benchmarking, never use `node.store.allow_mmap: false` —
+it disables memory-mapped file access and invalidates performance
+measurements.
 
 ```yaml
 podTemplate:
@@ -223,11 +221,11 @@ podTemplate:
       securityContext:
         privileged: true
         runAsUser: 0
-      command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+      command: ['sh', '-c', 'sysctl -w vm.max_map_count=1048576']
 ```
 
-When `vm_max_map_count: verified` (host already configured), omit both
-the initContainer and `node.store.allow_mmap`.
+When readiness.toon reports `vm_max_map_count: verified` (host already
+configured), the initContainer can be omitted.
 
 ### Single-node, security enabled
 
@@ -245,10 +243,14 @@ spec:
   nodeSets:
   - name: default
     count: 1
-    config:
-      node.store.allow_mmap: false
     podTemplate:
       spec:
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=1048576']
         containers:
         - name: elasticsearch
           env:
@@ -296,12 +298,17 @@ spec:
   - name: default
     count: 3
     config:
-      node.store.allow_mmap: false
       xpack.security.enabled: false
       xpack.security.http.ssl.enabled: false
       xpack.security.transport.ssl.enabled: false
     podTemplate:
       spec:
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=1048576']
         containers:
         - name: elasticsearch
           env:
@@ -500,8 +507,8 @@ The Coordinator reads `readiness.toon` to make generation decisions:
 | `eck_operator: missing` | Include operator install in eck-up.sh |
 | `namespace: <name>` | Use declared namespace in all manifests |
 | `storage_class: <name>` | Set storageClassName in volumeClaimTemplates |
-| `vm_max_map_count: verified` | Omit `node.store.allow_mmap: false` |
-| `vm_max_map_count: unverified` | Include `node.store.allow_mmap: false` |
+| `vm_max_map_count: verified` | Omit sysctl initContainer |
+| `vm_max_map_count: unverified` | Include sysctl initContainer (`vm.max_map_count=1048576`) |
 
 ## Kustomize variation patterns
 
