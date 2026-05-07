@@ -4,16 +4,13 @@ description: Compare force-merge behavior across compose storage modes.
 hypothesis: hypothesis.md
 plan: hypothetest.yml
 readme: README.md
+status: design-sketch
 self_contained: false
 expected_runtime: 30m
 prerequisites:
   - docker or podman
   - espipe
   - esdiag
-include:
-  directories:
-    - data/
-    - generated/
 datasets:
   - name: logs
     path: data/logs.ndjson

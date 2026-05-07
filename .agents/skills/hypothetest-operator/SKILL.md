@@ -1,13 +1,19 @@
 ---
 name: hypothetest-operator
-description: Implement and evaluate Hypothetest Elasticsearch benchmark blueprints. Use when the user has a blueprint or hypothetest.yml and wants compose/Docker/Podman assets, execution scripts, evaluation artifacts, monitoring, Rally/espipe invocation, or operator guidance.
+description: Execute Hypothetest evaluation blueprints. Use when the user has a blueprint with Coordinator-generated assets and wants to run evaluation.sh, collect artifacts, monitor phases, invoke Rally/espipe, or get operator guidance.
 ---
 
 # Hypothetest Operator Skill
 
 You are the operator for Hypothetest.
 
-Your job is to follow the Architect's blueprint: turn `hypothetest.yml` and supporting assets into executable assets, execute or prepare the evaluation, monitor phases, and preserve artifacts. Think of the Operator as the machinery operator who follows the plans created by the Architect. Do not reinterpret the scientific question; if the blueprint is invalid, return actionable errors and route back to the Architect.
+Your job is to run the evaluation: execute `evaluation.sh` (which the Architect
+compiled), read its logs and output artifacts, and verify the evaluation.yml
+index is correct. Think of the Operator as the machinery operator who runs
+the plans — no generation, no helper scripts. The Coordinator generates
+environment-specific scripts; the Operator calls them through evaluation.sh.
+Do not reinterpret the scientific question; if the blueprint is invalid,
+return actionable errors and route back to the Architect.
 
 ## Initial target priority
 
@@ -16,8 +22,9 @@ Implement `compose` first.
 Supported initial deployment targets:
 
 1. `compose`
-2. `existing`
-3. `elastic-cloud`
+2. `kubernetes`
+3. `existing`
+4. `elastic-cloud`
 
 For MVP work, prefer local compose using Docker or Podman.
 
@@ -49,7 +56,7 @@ use the Coordinator-owned schema to validate input `hypothetest.yml`.
 Before generating or executing anything, validate that:
 
 - YAML schema validation succeeds with `ys`, installed via `cargo install yaml-schema`; if `cargo` or `ys` is unavailable, route to Coordinator setup.
-- Coordinator readiness evidence is present for scenario-required tools, credentials, access preflights, dataset access, and deployment prerequisites. Do not proceed from tool availability alone.
+- Coordinator readiness evidence (`generated/readiness.toon`) is checked. If absent, the runner warns that tool versions, credentials, dataset access, and deployment prerequisites have not been verified. Execution continues — this is an informed-consent warning, not a hard gate.
 - `deployment.target` is supported.
 - `dataset.loader` is `rally` or `espipe`.
 - `variations` contains at least two entries.
@@ -61,25 +68,25 @@ Before generating or executing anything, validate that:
 
 If validation fails, stop with actionable feedback and point the user back to the Architect. Do not infer or invent missing blueprint or scenario intent.
 
-If Coordinator readiness is absent or stale, stop and route back to the Coordinator before starting deployments, loading data, collecting metrics, or running destructive reset/teardown steps.
+If Coordinator readiness is absent or stale, the runner warns the user and continues. The warning explains what has not been verified and suggests running the Coordinator to generate readiness evidence.
 
-Output:
+Output (runner-produced):
 
 ```text
 evaluations/<hypothesis-name>/<timestamp>/
-  evaluation.yml
-  manifest.toon
-  hypothesis.md
-  hypothetest.yml
+  evaluation.yml           # schema-valid index of all artifacts
+  hypothesis.md            # copy of the experiment hypothesis
+  hypothetest.yml          # copy of the plan
   evidence/
-    raw/
-    diagnostics/
-    phase-output/
-  measurements/
-  comparisons/
-  charts/
-  report.md
+    raw/                   # raw API responses, esdiag bundles
+    diagnostics/           # before/after diagnostic captures
+    phase-output/          # per-variation/repeat espipe output, load manifests
+  measurements/            # per-variation/repeat store stats, timing
 ```
+
+The Analyst produces additional artifacts after consuming the runner
+output: normalized measurements, comparisons, charts, summary.toon,
+comparison.toon, and report.md. These are not Operator deliverables.
 
 ## Compose engine handling
 
@@ -101,18 +108,19 @@ Resolution order when `engine: auto`:
 
 Do not assume Docker is present.
 
-For `scope: remote`, require Coordinator readiness evidence before execution. The remote host must be reachable through the user's `.ssh/config` using SSH certificate auth, and the remote user must be able to execute the resolved compose command:
+For `scope: remote`, Coordinator readiness evidence should verify SSH reachability and compose permissions before execution. If readiness evidence is absent, the runner warns the user (see readiness warning in the validation section above) but continues. The remote host must be reachable through the user's `.ssh/config` using SSH certificate auth, and the remote user must be able to execute the resolved compose command:
 
 - `docker compose version` for Docker.
 - `podman compose version` or `podman-compose --version` for Podman.
 
-Execute compose operations on the remote host in the declared `deployment.remote.workdir`. Do not attempt remote execution when SSH access or compose permissions are unverified.
+Execute compose operations on the remote host in the declared `deployment.remote.workdir`.
 
 For remote compose, treat SSH as the deployment control plane, not the dataset transport. Do not copy raw corpus files to `deployment.remote.workdir` by default. Load data through the declared indexing/workload tool, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the remote deployment. Only stage raw data on the remote host when the blueprint explicitly declares remote data generation, a remote download, or a remote-local phase script.
 
-## Compose generated assets
+## Compose assets
 
-Generate or maintain:
+The Coordinator generates compose infrastructure. The Operator consumes it
+via `generated/scripts/compose-up.sh` and `compose-down.sh`. Expected layout:
 
 ```text
 generated/compose/compose.yml
@@ -122,9 +130,30 @@ generated/compose/repositories/
 generated/compose/volumes/
 ```
 
-For snapshot/searchable-snapshot scenarios on local compose, configure an Elasticsearch filesystem repository. Mount the repository directory into the Elasticsearch container and set `path.repo` in `elasticsearch.yml`. MinIO and S3-compatible services are out of scope for local compose.
+The Operator does not generate or modify these assets.
 
-Generated compose assets must be deterministic for the same `hypothetest.yml`. Prefer named volumes unless the scenario explicitly asks for bind mounts.
+## Kubernetes assets
+
+The Coordinator generates kubernetes infrastructure. The generated runner
+calls `eck-up.sh` and `eck-down.sh` as lifecycle tasks, matching the compose
+convention (`compose_up` / `compose_down`). The runner passes the baseline
+variation to `eck-up.sh` via `HYPOTHETEST_VARIATION` and tracks
+`CURRENT_VARIATION` so `apply_variation` skips the redundant first apply.
+
+When the provider is k3s, `k3s-install.sh` and `k3s-uninstall.sh` handle
+the cluster lifecycle independently of ECK. Expected layout:
+
+```text
+generated/eck/namespace.yaml
+generated/eck/elasticsearch.yaml
+generated/eck/kibana.yaml          (only when services.kibana: true)
+generated/scripts/eck-up.sh
+generated/scripts/eck-down.sh
+generated/scripts/k3s-install.sh   (only when provider: k3s)
+generated/scripts/k3s-uninstall.sh (only when provider: k3s)
+```
+
+The Operator does not generate or modify these assets.
 
 ## Execution loop
 
@@ -158,7 +187,6 @@ evaluation:
     - delete_indices
     - clear_caches
     - reload_dataset
-    - delete_volumes
     - verify_cluster_green
 ```
 
@@ -261,62 +289,119 @@ metrics[2]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
   example,evaluation-001,compose,candidate,1,warm_search,search_latency_p99,150,ms,rally,ok
 ```
 
-## Evaluation Record
+## During-phase observation
 
-Create `evaluation.yml` as the schema-valid index of the completed or partial
-evaluation. It must validate against this skill's bundled
-`schemas/evaluation.schema.yaml` and point
-to the preserved evidence, measurements, comparisons, report, summary, and
-charts.
+When `measure.diagnostics.during` is declared and its profile is not `none`,
+the Coordinator generates `generated/scripts/sample.sh` — a sampling script
+that collects interval-based observations while phases execute. The Operator
+does not generate this script; it runs it.
 
-Record runtime explicitly. `manifest.runtime.total_seconds` is the elapsed wall-clock time from evaluation start to evaluation completion or failure. `manifest.runtime.variations` records each variation's elapsed wall-clock runtime, including repeat number when repeats are used. Compute variation runtime from the start of that variation's reset/provisioning through artifact archival for that variation/repeat, so loading, setup, phases, diagnostics, and archive cost are included.
+### Invocation
 
-Also create `manifest.toon` as the compact runtime manifest with:
+When during-phase observation is active, evaluation.sh task functions for
+workload phases delegate to sample.sh instead of running the phase command
+directly:
 
-```toon
-scenario: name
-started_at: ISO-8601
-completed_at: null
-runtime_total_seconds: 0
-runtime_total_human: 0s
-deployment_target: compose
-engine: docker
-elasticsearch_version: version
-experiment_intent: compare_deployments
-variations[0]:
-variables[1]: deployment
-constants_required[2]: dataset,workload
-constants_best_effort[1]: index.primary_shards
-repeats: 3
-variation_runtime[1]{variation,repeat,seconds,human,status}:
-  baseline,1,120.5,2m 0.5s,complete
-artifacts[0]:
+```bash
+./generated/scripts/sample.sh "$VARIATION" "$REPEAT" "$PHASE_NAME" \
+  espipe load --input ./data/docs.ndjson --target benchmark-index
 ```
 
-Also include:
+When `diagnostics.during` is absent or `profile: none`, evaluation.sh calls
+the phase command directly — no sample.sh wrapper.
 
-- `evaluation_id`
-- `git_commit` when available
-- `started_by` when available
-- `phase_statuses`
-- `failures`
-- `commands`
-- `runtime.total_seconds`
-- `runtime.variations`
-- `result_quality`
+When `diagnostics.during.phases` lists specific phase names, only those
+phases are wrapped. When omitted, all evaluation phases are wrapped.
+
+### Structured stdout
+
+sample.sh writes structured `[tag] key=value` lines to stdout.
+evaluation.sh's `run_task` captures these to `${HYPOTHETEST_LOG_DIR}/<task>.log`.
+The Operator reads the log files to determine phase outcomes.
+
+| Tag | Meaning |
+|---|---|
+| `[start]` | Phase sampling began; includes variation, repeat, phase, interval, methods |
+| `[sample]` | One sample collected; includes t, method, key signal values |
+| `[skip]` | Sample skipped; reason is `collection_slow` or `short_phase` |
+| `[error]` | Collection failed for one method at time t; sampling continues |
+| `[phase_complete]` | Phase finished; includes elapsed time and exit code |
+
+When sample.sh backgrounds the phase command, both the phase's stdout and
+sampling `[tag]` lines land in the same log file. Parse by `[tag]` prefix,
+not by line position.
+
+### Exit codes
+
+| Code | Meaning | Operator action |
+|---|---|---|
+| 0 | Phase succeeded, sampling complete | Continue to next phase |
+| Non-zero | Phase command exited non-zero | Record failure, apply `continue_on_error` policy |
+
+sample.sh passes through the phase command's exit code. Sampling failures
+(API unreachable, slow collection) are logged but do not change the exit code.
+
+### Output layout
+
+All artifacts land under `${HYPOTHETEST_EVIDENCE_DIR}/during/`:
+
+```
+${HYPOTHETEST_EVIDENCE_DIR}/during/
+  <variation>-<repeat>-<phase>-<method>.toon   # time-series (use, latency)
+  <variation>-<repeat>-<phase>-tsa/            # text archive (TSA)
+  <variation>-<repeat>-<phase>-on_cpu/         # perf archive
+  <variation>-<repeat>-<phase>-off_cpu/        # bpftrace archive
+  <variation>-<repeat>-<phase>-raw/            # raw API responses (debugging)
+```
+
+Methods that produce time-series (use, latency) write TOON files. Methods
+that produce snapshots (tsa, on_cpu, off_cpu) write directories. Raw API
+responses are always archived regardless of method.
+
+## Evaluation Record
+
+The runner generates `evaluation.yml` as the schema-valid index of the
+completed or partial evaluation. It must validate against this skill's
+bundled `schemas/evaluation.schema.yaml` and point to the preserved
+evidence and raw measurements.
+
+The runner records:
+
+- `name`, `hypothesis`, `plan` — identity and source references
+- `manifest` — runtime metadata: start/end times, status, blueprint,
+  plan, variations list, repeats, quality label, and per-variation
+  runtime
+- `evidence` — paths to raw API responses, diagnostics, phase output
+- `measurements` — primary and secondary metric names; `normalized`
+  is left empty for the Analyst to populate
+- `comparisons` — baseline, candidates; `artifacts` and `decision`
+  are left empty for the Analyst to populate
+
+Record runtime explicitly. `manifest.runtime.total_seconds` is the
+elapsed wall-clock time from evaluation start to completion or failure.
+`manifest.runtime.variations` records each variation's elapsed
+wall-clock runtime. Compute variation runtime from the start of that
+variation's reset/provisioning through artifact archival, so loading,
+phases, diagnostics, and archive cost are included.
+
+The Operator does not produce `manifest.toon`, `summary.toon`,
+`comparison.toon`, normalized measurements, charts, or `report.md`.
+Those are Analyst deliverables produced after consuming the runner
+output.
 
 ## Failure behavior
 
-If a phase fails:
+The generated runner writes a partial `evaluation.yml` on failure via an
+ERR trap. The partial index records:
 
-1. Preserve logs and partial metrics.
-2. Mark the variation/repeat/phase as failed.
-3. Continue only if the scenario says `continue_on_error: true`.
-4. Write a clear failure summary.
+- `manifest.status: failed` and `manifest.quality: incomplete`
+- `manifest.failures` with the failed task name and exit code
+- Whatever evidence artifacts (raw measurements, diagnostics, phase output)
+  existed at the time of failure
 
 If diagnostics collection fails, preserve deployment state and raw evidence before teardown whenever that state is needed to recover primary metrics or explain the failure. Do not delete volumes or otherwise destroy the only remaining source of required metrics after a diagnostics credential or access failure unless the scenario explicitly says cleanup is more important than recoverability.
 
-Partial evaluations are valid Analyst inputs as long as `manifest.toon` records what completed, what failed, and where raw artifacts live.
+Partial evaluations are valid Analyst inputs as long as `evaluation.yml` records what completed, what failed, and where raw artifacts live.
 
 ## Safety and reproducibility
 
@@ -329,5 +414,4 @@ Partial evaluations are valid Analyst inputs as long as `manifest.toon` records 
 
 ## References
 
-- `references/operator-evaluation-guide.md`
 - `references/artifacts.md`

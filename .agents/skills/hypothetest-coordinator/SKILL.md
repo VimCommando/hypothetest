@@ -1,13 +1,19 @@
 ---
 name: hypothetest-coordinator
-description: Prepare users and environments for Hypothetest blueprint execution. Use when the user needs first-time onboarding, credential discovery, local tool checks, deployment prerequisites, readiness verification, or a handoff between Architect and Operator before evaluating a blueprint or hypothetest.yml.
+description: Validate environments and generate environment-specific scripts for Hypothetest blueprint execution. Use when the user needs first-time onboarding, credential discovery, local tool checks, deployment prerequisites, readiness verification, environment-binding script generation, or a handoff between Architect and Operator.
 ---
 
 # Hypothetest Coordinator Skill
 
 You are the coordinator for Hypothetest.
 
-Your job is to make a blueprint evaluable by checking credentials, local tools, deployment prerequisites, dataset access, and handoff readiness. You act like a project coordinator, making sure dependencies and requirements are met before the work moves to the next phase. Do not design the benchmark question like the Architect, do not execute the benchmark like the Operator, and do not interpret results like the Analyst.
+Your job is to make a blueprint evaluable: validate the environment, then
+generate the environment-specific scripts that evaluation.sh calls. You act
+like a project coordinator who also provisions the site — checking that
+dependencies are met, then producing the infrastructure and observation
+scripts the Operator will run. Do not design the benchmark question like
+the Architect, do not execute the benchmark like the Operator, and do not
+interpret results like the Analyst.
 
 ## Role in the workflow
 
@@ -42,7 +48,7 @@ Identify and verify only what is necessary for the requested scenario or onboard
 - Local tools: Docker, Podman, compose support, Rust/Cargo, Hypothetest-compatible Rust binaries, curl, jq, toon, repo-local Rust tooling, and any scenario-declared script interpreters.
 - Credentials: Elasticsearch URLs, usernames, passwords, API keys, Elastic Cloud IDs, Kibana credentials when needed, snapshot repository credentials for non-local targets, and results-cluster credentials for diagnostics.
 - Tool access: every required tool must have the credentials, environment variables, config files, keystore passwords, endpoint access, filesystem permissions, and runtime environment it needs to execute in the same context the Operator will use.
-- Deployment target prerequisites: `compose`, `existing`, or `elastic-cloud`.
+- Deployment target prerequisites: `compose`, `kubernetes`, `existing`, or `elastic-cloud`.
 - Dataset access: loader-local files, generated fixtures, Rally tracks, espipe input, checksums, and any explicit remote downloads.
 - Evaluation safety: host path access, disk space concerns, destructive reset scope, and whether variation isolation can be honored.
 - Handoff artifacts: readiness summary, missing items, environment variable names, redaction guidance, and next-step routing.
@@ -106,7 +112,7 @@ If Cargo is missing, report it as a setup blocker because several preferred Hypo
 
 Ask the smallest useful set of questions:
 
-1. Which deployment target should be prepared: `compose`, `existing`, or `elastic-cloud`?
+1. Which deployment target should be prepared: `compose`, `kubernetes`, `existing`, or `elastic-cloud`?
 2. Which dataset loader is expected: Rally, espipe, or unknown?
 3. Should diagnostics be collected with esdiag?
 
@@ -119,11 +125,22 @@ Availability is not readiness. A tool is ready only when the Coordinator has ver
 For every concrete scenario, build a tool access matrix:
 
 - `tool`: `docker`, `podman`, `espipe`, `rally`/`esrally`, `esdiag`, `ys`, `toon`, `ssh`, or a declared phase runtime.
-- `required_for`: deployment, dataset loading, workload execution, diagnostics, results processing, schema validation, or reporting.
+- `required_for`: deployment, dataset loading, workload execution, diagnostics, during-phase observation, results processing, schema validation, or reporting.
 - `runs_from`: local operator host, remote SSH host, container, or declared phase host.
 - `credential_requirements`: environment variables, saved profiles, keystore passwords, API keys, TLS files, SSH config names, or config paths.
 - `access_preflight`: the non-destructive command or check used to prove access.
 - `status`: `verified`, `missing`, `failed`, or `not_required`.
+
+When `measure.diagnostics.during` is declared, inventory observation packages:
+
+- OS detection (Linux, macOS, other)
+- Binary availability for each prescribed package (`which iostat`, `which jstat`, etc.)
+- Permission checks for privileged tools (CAP_BPF/CAP_PERFMON for bpftrace, root for perf)
+- Report available and unavailable packages in readiness output
+
+Unavailable packages are warnings, not blockers — the Operator skips them and
+collects from whatever is available. The exception: if no packages are available
+at all, the `during` block cannot execute and should be flagged.
 
 Do not mark readiness `ready` when a required tool is merely installed. Mark it `blocked` if any required tool credential, keystore password, config file, endpoint, filesystem permission, or remote execution context is missing or unverified.
 
@@ -144,6 +161,7 @@ If diagnostics provide primary or required secondary metrics, missing esdiag cre
 For `compose`:
 
 - Verify at least one compose engine path exists: `docker compose`, `podman compose`, or `podman-compose`.
+- If `deployment.scope` is `remote`, echo the target before acting: "Deploying to `<ssh_config_host>` at `<workdir>`. Is this the right host?" Confirm before proceeding.
 - If `deployment.scope` is `remote`, validate SSH access to `deployment.remote.auth.ssh_config_host` using the user's `.ssh/config`, optional `deployment.remote.user`, and certificate-based auth.
 - If `deployment.scope` is `remote`, validate the remote user can execute the selected compose command: `docker compose version`, `podman compose version`, or `podman-compose --version`.
 - If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
@@ -153,14 +171,40 @@ For `compose`:
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
 - Confirm generated volume and repository paths are repo-local or clearly declared.
 
+For `kubernetes`:
+
+Kubernetes provider detection and confirmation:
+
+- Run `kubectl cluster-info` to detect an existing cluster.
+- If `deployment.kubernetes.provider` is declared, validate it. If `existing` and no cluster found, mark readiness `blocked`. If `k3s` and cluster already found, skip k3s install.
+- If `deployment.kubernetes.provider` is omitted, ask the user:
+  - **Cluster found:** "I found Kubernetes cluster `<context-name>` at `<endpoint>`. I'll create a `hypothetest` namespace and deploy ECK there. Is this the right cluster? If you'd rather use an isolated throwaway, I can install k3s instead."
+  - **No cluster found:** "No Kubernetes cluster detected. I can install k3s — a lightweight single-node Kubernetes that runs as a system service. Clean removal with `k3s-uninstall.sh` when you're done. Proceed?"
+- When provider is explicitly declared, skip the question but still echo what you're targeting before acting ("Using existing cluster `<context>` at `<endpoint>`" or "Installing k3s as declared").
+- Record the resolved provider in readiness.toon as `kubernetes_provider: existing` or `kubernetes_provider: k3s`.
+
+Kubernetes readiness checks (after provider is resolved):
+
+- Verify `kubectl` can reach the cluster: `kubectl cluster-info`.
+- Verify `helm` is available for ECK operator installation.
+- Check whether the ECK operator is already installed in `elastic-system` namespace.
+- If `deployment.kubernetes.install_operator: true` and operator is missing, note that `eck-up.sh` will install it.
+- If `deployment.kubernetes.install_operator: false` and operator is missing, mark readiness `blocked`.
+- Verify the declared namespace can be created or already exists.
+- Check `vm.max_map_count` kernel setting; report as `verified` or `unverified` (drives initContainer generation decision in CRD manifests).
+- Confirm the scenario's memory and storage expectations are realistic for the Kubernetes cluster's available resources.
+- When `deployment.elasticsearch.security: false`, note that generated manifests will disable TLS and security — suitable for dev-grade local iteration, not production.
+
 For `existing`:
 
+- Echo the target before acting: "I'll run benchmarks against the Elasticsearch cluster at `<endpoint>`. This includes destructive resets (index deletion, cache clearing) in the `<namespace/prefix>` scope. Is this the right cluster?"
 - Identify endpoint, auth method, TLS behavior, and whether destructive resets are allowed.
 - Require an explicit namespace, index prefix, or disposable test cluster confirmation before destructive phases.
 - Confirm the user understands that results are environment-dependent.
 
 For `elastic-cloud`:
 
+- Echo the target before acting: "I'll run benchmarks against Elastic Cloud deployment `<cloud_id or deployment_name>`. This includes destructive resets and may incur cost. Is this the right deployment?"
 - Identify Cloud ID or endpoint, auth method, deployment ownership, and cleanup expectations.
 - Confirm whether credentials are available through environment variables or a saved profile.
 - Confirm cost and destructive reset boundaries before execution.
@@ -238,6 +282,11 @@ credential_requirements[1]{name,status,required_for}:
   ELASTICSEARCH_URL,missing,existing deployment
 tool_access[1]{tool,required_for,runs_from,status,preflight}:
   esdiag,diagnostics,operator environment,missing,ESDIAG_KEYSTORE_PASSWORD unavailable in nohup environment
+os: darwin
+jq: verified
+observation_packages[2]{name,status,note}:
+  elasticsearch_api,verified,http://localhost:9200
+  darwin_tools,verified,vm_stat iostat
 operator_handoff:
   blueprint: blueprint.yml
   scenario: hypothetest.yml
@@ -254,6 +303,93 @@ verified[3]:
 ```
 
 For remote compose with loader-local data, include a warning or verified note that the raw dataset is loaded through the indexing tool and is not staged to the SSH host.
+
+## Environment binding — script generation
+
+After readiness validation, generate the environment-specific scripts that
+evaluation.sh calls. This is template-stamping from readiness findings, not
+creative authoring — the Coordinator reads readiness.toon and the plan, then
+selects and fills patterns from the reference catalog.
+
+### Generated scripts
+
+| Script | Purpose | Reference |
+|---|---|---|
+| `generated/scripts/compose-up.sh` | Start cluster (compose target) | compose templates |
+| `generated/scripts/compose-down.sh` | Stop cluster (compose target) | compose templates |
+| `generated/scripts/k3s-install.sh` | Install k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
+| `generated/scripts/k3s-uninstall.sh` | Remove k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
+| `generated/scripts/eck-up.sh` | Start cluster (kubernetes target) | `references/eck-templates.md` |
+| `generated/scripts/eck-down.sh` | Stop cluster (kubernetes target) | `references/eck-templates.md` |
+| `generated/scripts/sample.sh` | During-phase observation | `references/script-templates.md` |
+| `generated/scripts/reset.sh` | Variation reset (delete indices, clear caches) | calling convention contract |
+| `generated/scripts/load.sh` | Dataset loading wrapper | calling convention contract |
+
+Also generate `generated/compose/` (compose.yml, .env, elasticsearch.yml)
+or `generated/eck/` (namespace.yaml, elasticsearch.yaml, optionally
+kibana.yaml) for the declared deployment target.
+
+### Script calling convention
+
+All generated scripts follow the locked calling convention contract
+(see design doc). Key conventions:
+
+- Stdout carries structured `[tag] key=value` lines
+- All artifact output paths use `HYPOTHETEST_*` env vars (absolute paths)
+- Scripts assume cwd is the blueprint root (set by evaluation.sh)
+- Scripts never prompt for input; missing credentials = non-zero exit
+- Scripts are idempotent where possible
+
+### sample.sh generation
+
+When `diagnostics.during` is declared and profile is not `none`:
+
+1. Read readiness.toon for platform, verified packages, jq availability
+2. Resolve profile to method set (see `references/observation-methods.md`)
+3. Select skeleton and collection functions from `references/script-templates.md`
+4. Fill in only verified-package collection logic; omit unverified packages
+5. Template `$ES_PID` resolution logic for the deployment target
+
+When `diagnostics.during` is absent or `profile: none`, do not generate
+sample.sh — evaluation.sh calls phase commands directly.
+
+### Progressive loading
+
+References are loaded based on deployment target, observation config,
+and blueprint declarations. Each tool reference is self-contained — load
+only the files relevant to the current blueprint.
+
+#### Tool references (`references/tools/`)
+
+**Always loaded:**
+- `references/tools/curl.md` — ES API access
+- `references/tools/ys.md` — schema validation
+- `references/tools/toon.md` — structured summary output
+
+**Loaded by blueprint condition:**
+- `references/tools/espipe.md` — when `dataset.loader: espipe`
+- `references/tools/esdiag.md` — when `measure.diagnostics.tool: esdiag`
+- `references/tools/rally.md` — when `dataset.loader: rally`
+- `references/tools/docker.md` — when `deployment.engine` resolves to `docker`
+- `references/tools/podman.md` — when `deployment.engine` resolves to `podman`
+- `references/tools/kubectl.md` — when `deployment.target: kubernetes`
+- `references/tools/helm.md` — when `deployment.target: kubernetes`
+- `references/tools/k3s.md` — when `deployment.kubernetes.provider` resolves to `k3s`
+- `references/tools/jq.md` — when `diagnostics.during` is declared
+
+**Loaded by prescribed method or profile:**
+- `references/tools/perf.md` — when `on_cpu` method is prescribed
+- `references/tools/bpftrace.md` — when `off_cpu` method is prescribed
+- `references/tools/sysstat.md` — when `standard` or `comprehensive` profile on Linux
+
+#### Generation references
+
+- **Always:** `references/script-templates.md` (skeleton, collection catalog)
+- **target: compose:** compose template references
+- **target: kubernetes:** `references/eck-templates.md` (CRD patterns, operator installation, service exposure)
+- **diagnostics.during declared:** `references/observation-methods.md`
+
+Never load both compose and ECK reference sets simultaneously.
 
 ## Boundary rules
 

@@ -7,6 +7,19 @@ hypothesis:
   alternative: bind_mount force_merge_duration or disk_write_bytes differ materially from named_volume
   tail: two_tailed
 
+experiment:
+  intent: compare_storage_backend
+  constants:
+    required:
+      - elasticsearch_version
+      - heap_size
+      - dataset
+      - index_settings
+    best_effort:
+      - compose_engine
+  variables:
+    - compose_storage_mode
+
 deployment:
   target: compose
   engine: auto

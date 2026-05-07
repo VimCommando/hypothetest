@@ -1,0 +1,30 @@
+name: eck-generic-ingest
+owner: infrastructure
+description: Generic Kubernetes (ECK) target example comparing ingest throughput across heap configurations.
+hypothesis: hypothesis.md
+plan: hypothetest.yml
+readme: README.md
+status: requires-external-dataset
+self_contained: false
+expected_runtime: 30m
+prerequisites:
+  - kubectl
+  - helm
+  - espipe
+  - esdiag
+  - kubernetes cluster (k3s or existing)
+include:
+  directories:
+    - generated/
+datasets:
+  - name: docs
+    path: data/docs.ndjson
+    format: ndjson
+    target: benchmark-index
+    description: >
+      Generic NDJSON document corpus for ingest benchmarking. Must be
+      present at data/docs.ndjson relative to the blueprint root before
+      execution.
+archive:
+  format: zip
+  include_evaluations: false

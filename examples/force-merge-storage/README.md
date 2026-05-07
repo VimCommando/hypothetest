@@ -1,5 +1,7 @@
 # Force Merge Storage Comparison
 
+> **Status:** design-sketch — blueprint only, no generated assets or datasets.
+
 This blueprint compares force-merge behavior between Docker named-volume and bind-mount Elasticsearch storage in a local compose deployment.
 
 ## Prerequisites

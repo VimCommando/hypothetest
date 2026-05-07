@@ -69,13 +69,19 @@ If any required intent is missing in compile mode, fail with a short error list 
 
 ## Deployment targets
 
-Initial target order:
+Target order:
 
 1. `compose` — first-class local iteration target using Docker or Podman.
-2. `existing` — existing Elasticsearch cluster.
-3. `elastic-cloud` — managed deployment target.
+2. `kubernetes` — Kubernetes target using Elastic Cloud on Kubernetes (ECK) operator.
+3. `existing` — existing Elasticsearch cluster.
+4. `elastic-cloud` — managed deployment target.
 
 Prefer `compose` unless the user explicitly asks for another target.
+
+When `elasticsearch.version` is `latest` or omitted, resolve to the
+current stable Elasticsearch release and surface it to the user before
+proceeding. The user may need a specific version for compatibility
+testing, regression work, or to match a production deployment.
 
 ## Compose defaults
 
@@ -87,7 +93,8 @@ deployment:
   scope: local
   engine: auto
   elasticsearch:
-    version: 8.18.0
+    version: latest
+    nodes: 1
     security: false
     heap: 2g
     memory: 4g
@@ -122,6 +129,38 @@ deployment:
 For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to execute the selected compose engine before Operator execution.
 
 Remote compose SSH controls the deployment host only. Do not imply that raw dataset files are copied to `deployment.remote.workdir`. Dataset ingestion still happens through the declared loader, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the deployment. Only generated compose assets, operator scripts, runtime manifests, and deployment support files belong on the remote SSH host unless the blueprint explicitly declares a remote-generated fixture or remote-local phase script.
+
+## Kubernetes defaults
+
+When target is `kubernetes`, use these defaults unless overridden:
+
+```yaml
+deployment:
+  target: kubernetes
+  namespace: hypothetest
+  elasticsearch:
+    version: latest
+    nodes: 1
+    storage: 10Gi
+    security: false
+    heap: 2g
+    memory: 4g
+  services:
+    kibana: false
+  kubernetes:
+    operator_version: 3.3.2
+    install_operator: true
+```
+
+When `kubernetes.provider` is omitted, the Coordinator detects whether a
+cluster exists and asks the user before acting. Explicit `provider: k3s`
+or `provider: existing` skips the question.
+
+Kubernetes output should be marked development-grade when running on k3s
+or similar lightweight distributions. The Coordinator generates CRD
+manifests in `generated/eck/` and lifecycle scripts (`eck-up.sh`,
+`eck-down.sh`) that follow the same calling convention contract as
+compose scripts.
 
 ## Dataset loaders
 
@@ -240,8 +279,13 @@ generated/
   scripts/
     evaluation.sh
   metrics-plan.yml
-  evaluation-guide.md
 ```
+
+The Architect produces `evaluation.sh` (deterministic task sequence compiled
+from the plan using `references/evaluation-template.sh` as the starting
+point). The Coordinator later adds environment-specific scripts
+(`compose-up.sh`, `reset.sh`, `load.sh`, `sample.sh`) and infrastructure
+assets (`compose/`, `eck/`) to the `generated/` directory.
 
 If creating Codex-ready repository content, use repo-scoped skills under `.agents/skills`.
 
@@ -302,6 +346,35 @@ measure:
 
 The Architect should include these API lists in `generated/metrics-plan.yml` and ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.
 
+## During-phase observation
+
+Optionally recommend `diagnostics.during` when the scenario benefits from
+interval-based observation during phase execution. This is additive — boundary
+diagnostics (`at`) remain the default and work without `during`.
+
+```yaml
+measure:
+  diagnostics:
+    tool: esdiag
+    at: { ... }
+    during:
+      profile: standard
+```
+
+Prescription rules:
+
+- Recommend for ingest throughput, search latency, or CPU-bound scenarios.
+- Skip for short phases (<15s) or simple storage comparisons.
+- Default to profile `standard`. Use `light` for latency-sensitive or cloud targets.
+- Add explicit methods (`latency`, `on_cpu`, `tsa`) when the scenario warrants deeper investigation.
+- When the `latency` method is active, set `shape: percentile_set` on latency metrics.
+
+See `references/observation-methods.md` for prescription rules, profiles,
+and platform-aware guidance. The full method catalog (collection shapes,
+TOON formats, interpretation patterns) is in the Coordinator-hosted
+`observation-methods.md` — the Architect prescribes methods, the
+Coordinator resolves them to available packages.
+
 ## Validation checklist
 
 Before finalizing a blueprint:
@@ -316,7 +389,7 @@ Before finalizing a blueprint:
 - `experiment.constants.best_effort` identifies controls that may be platform-managed or not directly configurable, and interpretation limits explain their impact.
 - Statistical plans declare the null hypothesis, alternative hypothesis, alpha, confidence, test method, test direction, assumptions, and practical effect threshold when those are relevant.
 - Multiple primary metrics or multiple candidates declare a multiple-comparison correction strategy or mark the comparison exploratory.
-- Deployment target is one of `compose`, `existing`, or `elastic-cloud`.
+- Deployment target is one of `compose`, `kubernetes`, `existing`, or `elastic-cloud`.
 - Dataset loader is `rally` or `espipe`.
 - At least two variations exist.
 - A baseline is named and exists in variations.
@@ -351,3 +424,4 @@ Return concrete files or patches when possible. Avoid abstract brainstorming onc
 - `references/compose-target.md`
 - `references/canonical-schema.md`
 - `references/evaluation-template.sh`
+- `references/observation-methods.md`

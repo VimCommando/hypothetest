@@ -4,6 +4,7 @@ description: Compare frozen searchable snapshot search cost with and without for
 hypothesis: hypothesis.md
 plan: hypothetest.yml
 readme: README.md
+status: design-sketch
 self_contained: false
 expected_runtime: 45m
 prerequisites:
@@ -11,12 +12,6 @@ prerequisites:
   - esrally
   - espipe
   - esdiag
-include:
-  directories:
-    - data/
-    - tracks/
-    - templates/
-    - generated/
 datasets:
   - name: http-logs
     path: data/http_logs.ndjson

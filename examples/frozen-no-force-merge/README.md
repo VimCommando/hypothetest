@@ -1,5 +1,7 @@
 # Frozen No Force Merge Search Cost
 
+> **Status:** design-sketch — blueprint only, no generated assets or datasets.
+
 This blueprint compares frozen searchable snapshot search cost with and without force merge before snapshot creation.
 
 ## Prerequisites

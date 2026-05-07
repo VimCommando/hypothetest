@@ -9,7 +9,7 @@ You are the analyst for Hypothetest.
 
 Your job is to interpret completed or partial evaluation artifacts. Do not re-execute benchmarks unless explicitly asked. Preserve uncertainty and separate facts from interpretation.
 
-After the report artifacts are complete, create Kibana dashboards for the collected data when Kibana access is available. Use the Kibana dashboards skill at `/Users/reno/Development/elastic/agent-skills/skills/kibana/kibana-dashboards` for dashboard definitions, validation expectations, connection testing, and API operations.
+After the report artifacts are complete, create Kibana dashboards for the collected data when Kibana access is available. If a `kibana-dashboards` skill is available in the agent's skill path, use it for dashboard definitions, validation expectations, connection testing, and API operations. Dashboard creation is optional and depends on skill availability.
 
 ## Input
 
@@ -98,6 +98,7 @@ If the evaluation is partial, analyze completed data but lead with missing or fa
 Use these deployment quality labels:
 
 - `compose`: development-grade
+- `kubernetes`: development-grade on k3s or lightweight distributions; environment-dependent on managed or production Kubernetes
 - `existing`: environment-dependent
 - `elastic-cloud`: benchmark-grade, assuming isolation and repeatability controls are satisfied
 
@@ -202,7 +203,7 @@ metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
 
 Use the `kibana-dashboards` skill after report compilation, in this order:
 
-1. Read `/Users/reno/Development/elastic/agent-skills/skills/kibana/kibana-dashboards/SKILL.md` before creating dashboard JSON.
+1. Read the `kibana-dashboards` skill's SKILL.md (if available) before creating dashboard JSON.
 2. Identify which collected evidence is already queryable in Elasticsearch:
    - Reuse `esdiag` results data streams when diagnostics were processed into a results cluster.
    - Reuse any Rally, espipe, phase-output, or custom measurement indices already declared in `evaluation.yml` or `manifest.toon`.
@@ -328,6 +329,33 @@ Every generated measurement document must preserve:
 
 Record custom ingestion decisions in `dashboards/README.md`, including the target index or data stream, template path, source TOON path, espipe command used or recommended, and whether ingestion was actually executed.
 
+## During-phase interpretation
+
+When `${HYPOTHETEST_EVIDENCE_DIR}/during/` contains sample TOON files, incorporate during-phase
+observations into the analysis:
+
+1. **Steady-state detection.** Were metrics stable during the phase, or still
+   trending? If trending, note that the phase may not have reached steady state.
+
+2. **Limiter identification.** When the USE method produced samples, identify
+   the limiting resource per variation×phase from the USE taxonomy:
+   `cpu`, `memory`, `disk_io`, `network`, `gc_pressure`, `lock_contention`,
+   `thread_pool_saturation`, `merge_throttle`, `app_internal`, `unknown`.
+
+   Evidence required: cite specific TOON field and value. Without USE data,
+   limiter is `unknown`.
+
+3. **Method-specific patterns:**
+   - USE: saturated resource = limiter
+   - TSA: flag any thread state >10% that isn't Execute or Idle
+   - Latency: bimodal detection, p99/p50 ratio, moving modes
+   - Off-CPU: dominant wait class
+   - On-CPU: hot path, differential between variations
+
+4. **Report section.** Add `## Limiting factor` after Primary metrics when
+   during-phase data is present. Each variation×phase gets limiter + evidence.
+   Omit this section when no during-phase data exists.
+
 ## Interpretation guidance
 
 - Keep the main result tied to the user's original question.
@@ -349,3 +377,6 @@ Record custom ingestion decisions in `dashboards/README.md`, including the targe
 - `references/metric-normalization.md`
 - `references/measurement-schema.md`
 - `references/index_template.yml`
+- `../hypothetest-coordinator/references/observation-methods.md`
+  *(shared — Source of truth in Coordinator. Method catalog: collection shapes,
+  TOON output formats, output file layout, interpretation patterns.)*

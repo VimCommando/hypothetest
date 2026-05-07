@@ -47,7 +47,17 @@ evaluation:
       tool: rally
       with: {}
 measure:
-  primary: []
+  primary:
+    - name: metric_name
+      source: elasticsearch_api
+      unit: bytes
+      api: /index/_stats/store
+      field: _all.total.store.size_in_bytes
+      phase: measured_phase
+      shape: scalar
+      measures: what this number represents
+      validity_note: what would make it misleading
+    - simple_metric_name
   secondary: []
   diagnostics:
     tool: esdiag
@@ -56,6 +66,8 @@ measure:
         apis:
           - _cluster/health
           - _nodes/stats
+    during:
+      profile: standard
 compare:
   baseline: baseline
   candidates: [candidate]
