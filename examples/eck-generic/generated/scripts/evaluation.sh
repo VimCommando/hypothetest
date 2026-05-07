@@ -587,7 +587,7 @@ function task_write_evaluation_index() {
     local eval_end
     eval_end="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     local eval_start_epoch eval_end_epoch total_seconds
-    eval_start_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${EVAL_START_TIME}" +%s 2>/dev/null || date -d "${EVAL_START_TIME}" +%s 2>/dev/null || echo 0)"
+    eval_start_epoch="$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${EVAL_START_TIME%Z}" +%s 2>/dev/null || date -d "${EVAL_START_TIME}" +%s 2>/dev/null || echo 0)"
     eval_end_epoch="$(date +%s)"
     total_seconds=$(( eval_end_epoch - eval_start_epoch ))
 
