@@ -27,10 +27,10 @@ Accept a candidate if its post-force-merge store size is **>10% smaller** than `
 
 ```sh
 # Verify readiness first
-hypothetest coordinator check --blueprint blueprints/index-mode-storage/
+hypothetest coordinator check --blueprint examples/index-mode-storage/
 
 # Then execute the evaluation
-hypothetest operator evaluation --blueprint blueprints/index-mode-storage/
+hypothetest operator evaluation --blueprint examples/index-mode-storage/
 ```
 
 See `generated/scripts/evaluation.sh` for the full evaluation sequence.

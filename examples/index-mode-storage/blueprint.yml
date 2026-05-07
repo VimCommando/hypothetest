@@ -19,7 +19,7 @@ datasets:
   - name: yelp-reviews
     path: datasets/yelp/yelp_academic_dataset_review.json
     format: jsonl
-    target: benchmark-index
+    target: per-variation
     description: >
       Yelp Academic Dataset review corpus (NDJSON). Must be present on the
       remote host at datasets/yelp/yelp_academic_dataset_review.json relative

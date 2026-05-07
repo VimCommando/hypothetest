@@ -11,10 +11,9 @@ Design influenced by the kustomize base/overlay pattern from
 [eck-kittyhawk](https://github.com/jdel12/eck-kittyhawk): base CRD
 manifests carry sensible defaults, and experiment-specific values (node
 count, heap, storage, version) are adaptation points the Coordinator
-fills from the blueprint's deployment block. The Coordinator generates
-final manifests directly (not kustomization.yaml files), but the
-separation-of-concerns principle is the same — base shape is stable,
-per-experiment variation is isolated to a small set of known fields.
+fills from the blueprint's deployment block. When an experiment declares
+multiple variations, the Coordinator generates a kustomize base/overlay
+structure so each variation is an isolated, reproducible manifest patch.
 
 ## Input contract
 
@@ -98,9 +97,19 @@ kubectl get deployment elastic-operator -n elastic-system -o jsonpath='{.status.
 
 ## Trial license
 
-Always apply an enterprise trial license after the operator is ready.
-This enables all ECK features (monitoring, autoscaling, advanced
-configuration) without requiring a paid license.
+Apply an enterprise trial license only when the blueprint explicitly
+declares it under `deployment.kubernetes.license`. This enables all ECK
+features (monitoring, autoscaling, advanced configuration) without
+requiring a paid license.
+
+```yaml
+# In hypothetest.yml:
+deployment:
+  kubernetes:
+    license:
+      type: enterprise_trial
+      accept_eula: true
+```
 
 ```yaml
 apiVersion: v1
@@ -114,7 +123,9 @@ metadata:
     elastic.co/eula: accepted
 ```
 
-Applied in `eck-up.sh` after operator install/verification, before CRDs.
+In `eck-up.sh`, gate behind `HYPOTHETEST_APPLY_TRIAL_LICENSE=true`.
+When the blueprint declares a license, the Coordinator sets this env var
+in the generated script. When absent, skip with a log message.
 
 ## Namespace pattern
 
@@ -491,3 +502,142 @@ The Coordinator reads `readiness.toon` to make generation decisions:
 | `storage_class: <name>` | Set storageClassName in volumeClaimTemplates |
 | `vm_max_map_count: verified` | Omit `node.store.allow_mmap: false` |
 | `vm_max_map_count: unverified` | Include `node.store.allow_mmap: false` |
+
+## Kustomize variation patterns
+
+When a blueprint declares multiple variations that change Kubernetes
+resource values (heap, memory, node count, storage, node roles), the
+Coordinator generates a kustomize base/overlay structure. This keeps
+the common CRD shape in one place and isolates variation-specific
+changes to small, reviewable patches.
+
+Reference: [eck-kittyhawk](https://github.com/jdel12/eck-kittyhawk)
+demonstrates this pattern for production ECK deployments.
+
+### Generated layout
+
+```
+generated/eck/
+  base/
+    kustomization.yaml
+    elasticsearch.yaml
+    namespace.yaml
+  overlays/
+    <variation-name>/
+      kustomization.yaml
+      patch.yaml
+```
+
+### Base kustomization
+
+The base contains the full CRD with the blueprint's baseline values.
+`kustomization.yaml` simply lists the resources:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - elasticsearch.yaml
+```
+
+### Overlay pattern
+
+Each variation overlay patches only the fields that differ. The overlay
+`kustomization.yaml` references the base and applies a strategic merge
+patch:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - path: patch.yaml
+```
+
+### Patch examples
+
+**Heap and memory variation** (the most common case):
+```yaml
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: hypothetest
+  namespace: hypothetest
+spec:
+  nodeSets:
+  - name: default
+    podTemplate:
+      spec:
+        containers:
+        - name: elasticsearch
+          env:
+          - name: ES_JAVA_OPTS
+            value: "-Xms4g -Xmx4g"
+          resources:
+            requests:
+              memory: 8Gi
+            limits:
+              memory: 8Gi
+```
+
+**Node count variation**:
+```yaml
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: hypothetest
+  namespace: hypothetest
+spec:
+  nodeSets:
+  - name: default
+    count: 3
+```
+
+The patch shape mirrors the base CRD — only the fields being varied
+are present. The Coordinator derives patch content from
+`variations.<name>.config` in the blueprint.
+
+### Applying variations
+
+The evaluation runner applies each variation with:
+
+```bash
+kustomize build generated/eck/overlays/${VARIATION} | kubectl apply -f -
+```
+
+Then waits for the cluster to reach green health before proceeding:
+
+```bash
+kubectl wait --for=jsonpath='{.status.health}'=green \
+  elasticsearch/hypothetest -n hypothetest \
+  --timeout=300s
+```
+
+After a variation completes (load, capture, diagnostics), the runner
+either:
+- Applies the next overlay (which triggers a rolling update), or
+- Tears down and recreates (when the variation changes are too
+  disruptive for a rolling update, e.g., storage class changes)
+
+The Coordinator decides which strategy to use based on the variation
+fields. Heap and memory changes support rolling updates. Storage,
+node role, and node count changes typically require teardown/recreate.
+
+### Variation cycling contract
+
+The evaluation runner for Kubernetes follows this loop:
+
+```
+for each variation:
+  1. kustomize build overlays/<variation> | kubectl apply
+  2. wait for cluster health green
+  3. run load phase
+  4. capture metrics and diagnostics
+  5. reset index (if not last variation)
+```
+
+The Coordinator generates this runner as `generated/scripts/evaluation.sh`
+with the same structure as compose evaluation runners — same task
+functions, same artifact contract, same log tag conventions.

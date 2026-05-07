@@ -7,6 +7,21 @@ hypothesis:
   alternative: not_force_merged p99 latency and repository bytes read are materially higher than force_merged
   tail: one_tailed
 
+experiment:
+  intent: compare_snapshot_preparation
+  constants:
+    required:
+      - elasticsearch_version
+      - heap_size
+      - dataset
+      - query_mix
+      - shard_count
+      - replica_count
+      - snapshot_repository
+    best_effort: []
+  variables:
+    - force_merge_before_snapshot
+
 deployment:
   target: compose
   engine: auto

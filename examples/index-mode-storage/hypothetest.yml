@@ -13,6 +13,24 @@ hypothesis:
   alternative: at least one variation achieves more than 10% smaller store size than standard after force-merge
   tail: one_tailed
 
+experiment:
+  intent: compare_data_configuration
+  constants:
+    required:
+      - elasticsearch_version
+      - heap_size
+      - dataset
+      - document_count
+      - shard_count
+      - replica_count
+      - bulk_batch_size
+    best_effort:
+      - remote_host_load
+  variables:
+    - index_mode
+    - codec
+    - index_sorting
+
 deployment:
   target: compose
   scope: remote
@@ -35,7 +53,7 @@ deployment:
 dataset:
   loader: espipe
   input: datasets/yelp/yelp_academic_dataset_review.json
-  target: benchmark-index
+  target: per-variation
   options:
     batch_size: 5000
   fixture:
@@ -110,7 +128,7 @@ evaluation:
       tool: espipe
       with:
         input: datasets/yelp/yelp_academic_dataset_review.json
-        target: http://ironhide.local:9200/benchmark-index
+        target: http://ironhide.local:9200/{variation_index}
         batch_size: 5000
 
     - name: collect_store_after_load
@@ -118,7 +136,7 @@ evaluation:
       with:
         request:
           method: GET
-          path: /benchmark-index/_stats/store,segments
+          path: /{variation_index}/_stats/store,segments
         artifact: store_after_load.json
 
     - name: force_merge
@@ -126,7 +144,7 @@ evaluation:
       with:
         request:
           method: POST
-          path: /benchmark-index/_forcemerge?max_num_segments=1&wait_for_completion=true
+          path: /{variation_index}/_forcemerge?max_num_segments=1&wait_for_completion=true
         artifact: force_merge_result.json
 
     - name: collect_store_after_force_merge
@@ -134,7 +152,7 @@ evaluation:
       with:
         request:
           method: GET
-          path: /benchmark-index/_stats/store,segments
+          path: /{variation_index}/_stats/store,segments
         artifact: store_after_force_merge.json
 
 measure:
@@ -142,7 +160,7 @@ measure:
     - name: store_size_after_force_merge
       unit: bytes
       source: elasticsearch_api
-      api: /benchmark-index/_stats/store
+      api: /{variation_index}/_stats/store
       field: _all.total.store.size_in_bytes
       phase: collect_store_after_force_merge
 
@@ -156,21 +174,21 @@ measure:
     - name: store_size_after_load
       unit: bytes
       source: elasticsearch_api
-      api: /benchmark-index/_stats/store
+      api: /{variation_index}/_stats/store
       field: _all.total.store.size_in_bytes
       phase: collect_store_after_load
 
     - name: segment_count_after_load
       unit: count
       source: elasticsearch_api
-      api: /benchmark-index/_stats/segments
+      api: /{variation_index}/_stats/segments
       field: _all.total.segments.count
       phase: collect_store_after_load
 
     - name: segment_count_after_force_merge
       unit: count
       source: elasticsearch_api
-      api: /benchmark-index/_stats/segments
+      api: /{variation_index}/_stats/segments
       field: _all.total.segments.count
       phase: collect_store_after_force_merge
 

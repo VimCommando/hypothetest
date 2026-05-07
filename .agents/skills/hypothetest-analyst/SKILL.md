@@ -9,7 +9,7 @@ You are the analyst for Hypothetest.
 
 Your job is to interpret completed or partial evaluation artifacts. Do not re-execute benchmarks unless explicitly asked. Preserve uncertainty and separate facts from interpretation.
 
-After the report artifacts are complete, create Kibana dashboards for the collected data when Kibana access is available. Use the Kibana dashboards skill at `/Users/reno/Development/elastic/agent-skills/skills/kibana/kibana-dashboards` for dashboard definitions, validation expectations, connection testing, and API operations.
+After the report artifacts are complete, create Kibana dashboards for the collected data when Kibana access is available. If a `kibana-dashboards` skill is available in the agent's skill path, use it for dashboard definitions, validation expectations, connection testing, and API operations. Dashboard creation is optional and depends on skill availability.
 
 ## Input
 
@@ -203,7 +203,7 @@ metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metri
 
 Use the `kibana-dashboards` skill after report compilation, in this order:
 
-1. Read `/Users/reno/Development/elastic/agent-skills/skills/kibana/kibana-dashboards/SKILL.md` before creating dashboard JSON.
+1. Read the `kibana-dashboards` skill's SKILL.md (if available) before creating dashboard JSON.
 2. Identify which collected evidence is already queryable in Elasticsearch:
    - Reuse `esdiag` results data streams when diagnostics were processed into a results cluster.
    - Reuse any Rally, espipe, phase-output, or custom measurement indices already declared in `evaluation.yml` or `manifest.toon`.

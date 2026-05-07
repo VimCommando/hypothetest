@@ -45,9 +45,10 @@ else
   echo "[ready] phase=operator_verified"
 fi
 
-# --- trial license (enables all ECK features) ---
-echo "[start] phase=trial_license"
-kubectl apply -f - <<'EOF'
+# --- trial license (only when explicitly requested) ---
+if [ "${HYPOTHETEST_APPLY_TRIAL_LICENSE:-false}" = "true" ]; then
+  echo "[start] phase=trial_license"
+  kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Secret
 metadata:
@@ -58,6 +59,11 @@ metadata:
   annotations:
     elastic.co/eula: accepted
 EOF
+  echo "[complete] phase=trial_license"
+else
+  echo "[skip] phase=trial_license reason=not_requested"
+  echo "Set HYPOTHETEST_APPLY_TRIAL_LICENSE=true to apply an enterprise trial license"
+fi
 
 # --- namespace + CRDs ---
 kubectl apply -f "${ECK_DIR}/namespace.yaml"

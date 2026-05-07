@@ -11,7 +11,7 @@ primary_metrics:
     unit: bytes
     source: elasticsearch_api
     collection_point: after_force_merge
-    api: GET /benchmark-index/_stats/store,segments
+    api: GET /{variation_index}/_stats/store,segments
     extraction_path: _all.total.store.size_in_bytes
     phase: collect_store_after_force_merge
     artifact: store_after_force_merge.json
@@ -45,7 +45,7 @@ secondary_metrics:
     unit: bytes
     source: elasticsearch_api
     collection_point: after_load
-    api: GET /benchmark-index/_stats/store,segments
+    api: GET /{variation_index}/_stats/store,segments
     extraction_path: _all.total.store.size_in_bytes
     phase: collect_store_after_load
     artifact: store_after_load.json
@@ -57,7 +57,7 @@ secondary_metrics:
     unit: count
     source: elasticsearch_api
     collection_point: after_load
-    api: GET /benchmark-index/_stats/segments
+    api: GET /{variation_index}/_stats/segments
     extraction_path: _all.total.segments.count
     phase: collect_store_after_load
     artifact: store_after_load.json
@@ -71,7 +71,7 @@ secondary_metrics:
     unit: count
     source: elasticsearch_api
     collection_point: after_force_merge
-    api: GET /benchmark-index/_stats/segments
+    api: GET /{variation_index}/_stats/segments
     extraction_path: _all.total.segments.count
     phase: collect_store_after_force_merge
     artifact: store_after_force_merge.json

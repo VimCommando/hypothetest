@@ -130,8 +130,8 @@ while kill -0 "$PHASE_PID" 2>/dev/null; do
   T=$(( T + INTERVAL ))
 done
 
-wait "$PHASE_PID"
-PHASE_EXIT=$?
+PHASE_EXIT=0
+wait "$PHASE_PID" || PHASE_EXIT=$?
 
 ELAPSED=$(( $(date +%s) - START_TIME ))
 

@@ -43,6 +43,9 @@ deployment:
   kubernetes:
     operator_version: 3.3.2
     install_operator: true
+    license:
+      type: enterprise_trial
+      accept_eula: true
 
 dataset:
   loader: espipe

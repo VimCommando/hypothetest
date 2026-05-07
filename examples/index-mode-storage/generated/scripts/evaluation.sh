@@ -256,6 +256,10 @@ function variation_pipeline() {
     esac
 }
 
+function variation_index_name() {
+    variation_template_name "$1"
+}
+
 function variation_pipeline_name() {
     case "$1" in
         logsdb|logsdb_synthetic_source) echo "yelp-reviews-date-to-timestamp" ;;
@@ -311,16 +315,17 @@ function do_reset() {
 
 function do_load_data() {
     local variation="$1" repeat="$2"
-    local template pipeline pipeline_name
+    local template pipeline pipeline_name index_name
     template="$(variation_template "${variation}")"
     pipeline="$(variation_pipeline "${variation}")"
     pipeline_name="$(variation_pipeline_name "${variation}")"
+    index_name="$(variation_index_name "${variation}")"
 
     if [[ -n "${pipeline}" ]]; then
         run_cmd ./generated/scripts/load.sh "${variation}" "${repeat}" \
             espipe \
             "datasets/yelp/yelp_academic_dataset_review.json" \
-            "${ELASTICSEARCH_URL}/benchmark-index" \
+            "${ELASTICSEARCH_URL}/${index_name}" \
             --template "${template}" \
             --template-name "$(variation_template_name "${variation}")" \
             --batch-size 5000 \
@@ -330,7 +335,7 @@ function do_load_data() {
         run_cmd ./generated/scripts/load.sh "${variation}" "${repeat}" \
             espipe \
             "datasets/yelp/yelp_academic_dataset_review.json" \
-            "${ELASTICSEARCH_URL}/benchmark-index" \
+            "${ELASTICSEARCH_URL}/${index_name}" \
             --template "${template}" \
             --template-name "$(variation_template_name "${variation}")" \
             --batch-size 5000
@@ -351,19 +356,23 @@ function do_collect_diagnostics() {
 function do_collect_store_stats() {
     local variation="$1" repeat="$2" phase_name="$3"
     local output_dir="${HYPOTHETEST_MEASUREMENTS_DIR}/${variation}/${repeat}"
+    local index_name
+    index_name="$(variation_index_name "${variation}")"
     mkdir -p "${output_dir}"
 
-    curl -sf "${ELASTICSEARCH_URL}/benchmark-index/_stats/store,segments" \
+    curl -sf "${ELASTICSEARCH_URL}/${index_name}/_stats/store,segments" \
         > "${output_dir}/${phase_name}.json"
 }
 
 function do_force_merge() {
     local variation="$1" repeat="$2"
     local output_dir="${HYPOTHETEST_MEASUREMENTS_DIR}/${variation}/${repeat}"
+    local index_name
+    index_name="$(variation_index_name "${variation}")"
     mkdir -p "${output_dir}"
 
     curl -sf -X POST \
-        "${ELASTICSEARCH_URL}/benchmark-index/_forcemerge?max_num_segments=1&wait_for_completion=true" \
+        "${ELASTICSEARCH_URL}/${index_name}/_forcemerge?max_num_segments=1&wait_for_completion=true" \
         > "${output_dir}/force_merge_result.json"
 }
 
@@ -406,11 +415,50 @@ function task_compare_results() {
     log_info "Comparison: baseline=standard candidates=logsdb,logsdb_synthetic_source,standard_best_compression,standard_best_compression_sorted"
     log_info "Method: bootstrap, alpha=0.05, correction=bonferroni"
     log_info "Effect thresholds: store_size>10%, throughput<20% degradation"
+    log_info "Comparison data collected — Analyst role performs statistical analysis"
 }
 
-function task_write_report() {
-    log_info "Report formats: markdown, toon, charts"
-    log_info "Artifacts at: ${HYPOTHETEST_EVALUATION_DIR}"
+function task_write_evaluation_index() {
+    local eval_file="${HYPOTHETEST_EVALUATION_DIR}/evaluation.yml"
+
+    {
+        cat <<EOF
+plan: hypothetest.yml
+run_id: ${HYPOTHETEST_RUN_ID}
+start: ${EVAL_START_TIME}
+end: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+variations:
+EOF
+        local _prev_nullglob
+        _prev_nullglob=$(shopt -p nullglob) || true
+        shopt -s nullglob
+
+        for v in "${VARIATIONS[@]}"; do
+            echo "  ${v}:"
+            for (( r=1; r<=REPEATS; r++ )); do
+                local m_dir="measurements/${v}/${r}"
+                local p_dir="evidence/phase-output/${v}/${r}"
+                local d_dir="evidence/diagnostics/${v}/${r}"
+                echo "    repeat_${r}:"
+                echo "      measurements:"
+                for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*.json; do
+                    echo "        - ${m_dir}/$(basename "$f")"
+                done
+                echo "      phase_output:"
+                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
+                    echo "        - ${p_dir}/$(basename "$f")"
+                done
+                echo "      diagnostics:"
+                for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
+                    echo "        - ${d_dir}/$(basename "$f")"
+                done
+            done
+        done
+
+        ${_prev_nullglob}
+    } > "${eval_file}"
+
+    log_info "Evaluation index written to $(cyan "${eval_file}")"
 }
 
 # ----- Generated Evaluation Plan -----
@@ -437,19 +485,22 @@ Generated task plan — index-mode-storage:
        g. collect_store_stats after_force_merge
        h. collect_diagnostics after_force_merge
   5. compare_results
-  6. write_report
+  6. write_evaluation_index
   7. compose_down
 PLAN
 }
 
+declare EVAL_START_TIME=""
+
 function command_run() {
     cd "${blueprint_root}"
+    EVAL_START_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     run_task validate_prerequisites
     run_task prepare_workspace
     run_task compose_up
     run_task run_evaluation
     run_task compare_results
-    run_task write_report
+    run_task write_evaluation_index
     run_task compose_down
     log_info "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
 }
