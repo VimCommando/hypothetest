@@ -420,43 +420,103 @@ function task_compare_results() {
 
 function task_write_evaluation_index() {
     local eval_file="${HYPOTHETEST_EVALUATION_DIR}/evaluation.yml"
+    local eval_end
+    eval_end="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    local eval_start_epoch eval_end_epoch total_seconds
+    eval_start_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${EVAL_START_TIME}" +%s 2>/dev/null || date -d "${EVAL_START_TIME}" +%s 2>/dev/null || echo 0)"
+    eval_end_epoch="$(date +%s)"
+    total_seconds=$(( eval_end_epoch - eval_start_epoch ))
+
+    local _prev_nullglob
+    _prev_nullglob=$(shopt -p nullglob) || true
+    shopt -s nullglob
 
     {
         cat <<EOF
+name: index-mode-storage
+evaluation_id: ${HYPOTHETEST_RUN_ID}
+hypothesis: hypothesis.md
 plan: hypothetest.yml
-run_id: ${HYPOTHETEST_RUN_ID}
-start: ${EVAL_START_TIME}
-end: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-variations:
+manifest:
+  started_at: "${EVAL_START_TIME}"
+  completed_at: "${eval_end}"
+  status: complete
+  blueprint: blueprint.yml
+  plan: hypothetest.yml
+  quality: environment-dependent
+  variations:
 EOF
-        local _prev_nullglob
-        _prev_nullglob=$(shopt -p nullglob) || true
-        shopt -s nullglob
-
         for v in "${VARIATIONS[@]}"; do
-            echo "  ${v}:"
+            echo "    - ${v}"
+        done
+
+        cat <<EOF
+  repeats: ${REPEATS}
+  runtime:
+    total_seconds: ${total_seconds}
+    variations: []
+  failures: []
+evidence:
+  raw: []
+  diagnostics:
+EOF
+        for v in "${VARIATIONS[@]}"; do
             for (( r=1; r<=REPEATS; r++ )); do
-                local m_dir="measurements/${v}/${r}"
-                local p_dir="evidence/phase-output/${v}/${r}"
-                local d_dir="evidence/diagnostics/${v}/${r}"
-                echo "    repeat_${r}:"
-                echo "      measurements:"
-                for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*.json; do
-                    echo "        - ${m_dir}/$(basename "$f")"
-                done
-                echo "      phase_output:"
-                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
-                    echo "        - ${p_dir}/$(basename "$f")"
-                done
-                echo "      diagnostics:"
                 for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
-                    echo "        - ${d_dir}/$(basename "$f")"
+                    echo "    - path: evidence/diagnostics/${v}/${r}/$(basename "$f")"
+                    echo "      kind: diagnostic"
+                    echo "      format: zip"
                 done
             done
         done
 
-        ${_prev_nullglob}
+        echo "  phase_output:"
+        for v in "${VARIATIONS[@]}"; do
+            for (( r=1; r<=REPEATS; r++ )); do
+                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
+                    local bname ext kind_fmt
+                    bname="$(basename "$f")"
+                    ext="${bname##*.}"
+                    case "${ext}" in
+                        json) kind_fmt="format: json" ;;
+                        log)  kind_fmt="format: log" ;;
+                        yml)  kind_fmt="format: yml" ;;
+                        *)    kind_fmt="format: txt" ;;
+                    esac
+                    echo "    - path: evidence/phase-output/${v}/${r}/${bname}"
+                    echo "      kind: phase_output"
+                    echo "      ${kind_fmt}"
+                done
+            done
+        done
+
+        echo "  generated: []"
+
+        echo "measurements:"
+        echo "  normalized: []"
+        echo "  primary:"
+        echo "    - indexing_throughput_docs_per_sec"
+        echo "    - store_size_bytes"
+        echo "  secondary:"
+        echo "    - force_merge_duration_millis"
+
+        echo "comparisons:"
+        echo "  artifacts: []"
+        echo "  baseline: standard"
+        echo "  candidates:"
+        for v in "${VARIATIONS[@]}"; do
+            if [[ "${v}" != "standard" ]]; then
+                echo "    - ${v}"
+            fi
+        done
+
+        echo "report:"
+        echo "  path: report.md"
+        echo "  formats:"
+        echo "    - markdown"
     } > "${eval_file}"
+
+    ${_prev_nullglob}
 
     log_info "Evaluation index written to $(cyan "${eval_file}")"
 }

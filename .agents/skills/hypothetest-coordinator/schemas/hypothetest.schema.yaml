@@ -202,6 +202,16 @@ $defs:
             type: string
           install_operator:
             type: boolean
+          license:
+            type: object
+            additionalProperties: false
+            properties:
+              type:
+                enum:
+                  - enterprise_trial
+                  - basic
+              accept_eula:
+                type: boolean
 
   dataset:
     type: object

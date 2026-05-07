@@ -70,14 +70,14 @@ deployment:
 dataset:
   loader: espipe
   input: datasets/yelp/yelp_academic_dataset_review.json
-  target: benchmark-index
+  target: per-variation
   options:
     batch_size: 5000
   fixture:
     description: >
       Yelp Academic Dataset review corpus (NDJSON). Must be present at the
-      declared path on the remote host before execution. The Coordinator
-      must verify the file exists and is readable before the Operator executes the evaluation.
+      declared path before execution. The Coordinator must verify the file
+      exists and is readable before the Operator executes the evaluation.
 
 setup: []
 
@@ -145,7 +145,7 @@ evaluation:
       tool: espipe
       with:
         input: datasets/yelp/yelp_academic_dataset_review.json
-        target: http://ironhide.local:9200/benchmark-index
+        target: http://ironhide.local:9200/{variation_index}
         batch_size: 5000
 
     - name: collect_store_after_load
@@ -153,7 +153,7 @@ evaluation:
       with:
         request:
           method: GET
-          path: /benchmark-index/_stats/store,segments
+          path: /{variation_index}/_stats/store,segments
         artifact: store_after_load.json
 
     - name: force_merge
@@ -161,7 +161,7 @@ evaluation:
       with:
         request:
           method: POST
-          path: /benchmark-index/_forcemerge?max_num_segments=1&wait_for_completion=true
+          path: /{variation_index}/_forcemerge?max_num_segments=1&wait_for_completion=true
         artifact: force_merge_result.json
 
     - name: collect_store_after_force_merge
@@ -169,7 +169,7 @@ evaluation:
       with:
         request:
           method: GET
-          path: /benchmark-index/_stats/store,segments
+          path: /{variation_index}/_stats/store,segments
         artifact: store_after_force_merge.json
 ```
 
@@ -181,7 +181,7 @@ measure:
     - name: store_size_after_force_merge
       unit: bytes
       source: elasticsearch_api
-      api: /benchmark-index/_stats/store
+      api: /{variation_index}/_stats/store
       field: _all.total.store.size_in_bytes
       phase: collect_store_after_force_merge
 
@@ -195,21 +195,21 @@ measure:
     - name: store_size_after_load
       unit: bytes
       source: elasticsearch_api
-      api: /benchmark-index/_stats/store
+      api: /{variation_index}/_stats/store
       field: _all.total.store.size_in_bytes
       phase: collect_store_after_load
 
     - name: segment_count_after_load
       unit: count
       source: elasticsearch_api
-      api: /benchmark-index/_stats/segments
+      api: /{variation_index}/_stats/segments
       field: _all.total.segments.count
       phase: collect_store_after_load
 
     - name: segment_count_after_force_merge
       unit: count
       source: elasticsearch_api
-      api: /benchmark-index/_stats/segments
+      api: /{variation_index}/_stats/segments
       field: _all.total.segments.count
       phase: collect_store_after_force_merge
 

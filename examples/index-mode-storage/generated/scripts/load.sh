@@ -25,7 +25,7 @@ fi
 
 LOADER_EXIT=0
 "${LOADER}" "$@" \
-  > "${PHASE_OUTPUT_DIR}/espipe_stdout.json" \
+  > "${PHASE_OUTPUT_DIR}/espipe_output.json" \
   2> "${PHASE_OUTPUT_DIR}/espipe_stderr.log" \
   || LOADER_EXIT=$?
 
@@ -44,7 +44,7 @@ end: ${END_TIME}
 duration_sec: ${DURATION_SEC}
 exit_code: ${LOADER_EXIT}
 artifacts:
-  stdout: espipe_stdout.json
+  stdout: espipe_output.json
   stderr: espipe_stderr.log
 EOF
 

@@ -45,8 +45,8 @@ else
   echo "[ready] phase=operator_verified"
 fi
 
-# --- trial license (only when explicitly requested) ---
-if [ "${HYPOTHETEST_APPLY_TRIAL_LICENSE:-false}" = "true" ]; then
+# --- trial license (default true: plan declares enterprise_trial with accept_eula) ---
+if [ "${HYPOTHETEST_APPLY_TRIAL_LICENSE:-true}" = "true" ]; then
   echo "[start] phase=trial_license"
   kubectl apply -f - <<'EOF'
 apiVersion: v1
@@ -65,13 +65,13 @@ else
   echo "Set HYPOTHETEST_APPLY_TRIAL_LICENSE=true to apply an enterprise trial license"
 fi
 
-# --- namespace + CRDs ---
-kubectl apply -f "${ECK_DIR}/namespace.yaml"
+# --- namespace + CRDs (kustomize base/overlay) ---
+VARIATION="${HYPOTHETEST_VARIATION:-default-heap}"
+echo "[start] phase=apply_variation variation=${VARIATION}"
+kubectl apply -k "${ECK_DIR}/overlays/${VARIATION}"
 
-kubectl apply -f "${ECK_DIR}/elasticsearch.yaml"
-
-if [[ -f "${ECK_DIR}/kibana.yaml" ]]; then
-  kubectl apply -f "${ECK_DIR}/kibana.yaml"
+if [[ -f "${ECK_DIR}/base/kibana.yaml" ]]; then
+  kubectl apply -f "${ECK_DIR}/base/kibana.yaml"
 fi
 
 # --- wait for Elasticsearch health ---
