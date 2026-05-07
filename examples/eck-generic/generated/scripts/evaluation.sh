@@ -287,6 +287,7 @@ declare -a VARIATIONS=(
     default-heap
     larger-heap
 )
+declare BASELINE="default-heap"
 
 declare REPEATS=3
 
@@ -392,6 +393,16 @@ function ensure_port_forward() {
 }
 
 # ----- Generated Task Functions -----
+
+function task_eck_up() {
+    export HYPOTHETEST_VARIATION="${BASELINE}"
+    run_cmd ./generated/scripts/eck-up.sh
+    CURRENT_VARIATION="${BASELINE}"
+}
+
+function task_eck_down() {
+    run_cmd ./generated/scripts/eck-down.sh
+}
 
 function task_validate_prerequisites() {
     command -v espipe >/dev/null || { log_error "espipe not found"; return 1; }
@@ -695,7 +706,8 @@ Generated task plan — eck-generic-ingest:
 
   1. validate_prerequisites
   2. prepare_workspace
-  3. run_evaluation (6 slots, randomized):
+  3. eck_up (operator + baseline ES + port-forward)
+  4. run_evaluation (6 slots, randomized):
      per slot:
        a. apply_variation (kustomize overlay, wait for green health)
        b. reset (delete index, clear caches, verify green)
@@ -703,8 +715,9 @@ Generated task plan — eck-generic-ingest:
        d. load_data (espipe, capture to espipe_output.json)
        e. collect_store_stats after_load
        f. collect_diagnostics after_load
-  4. compare_results (log-only — Analyst performs analysis)
-  5. write_evaluation_index
+  5. compare_results (log-only — Analyst performs analysis)
+  6. write_evaluation_index
+  7. eck_down
 PLAN
 }
 
@@ -716,9 +729,11 @@ function command_run() {
     EVAL_START_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     run_task validate_prerequisites
     run_task prepare_workspace
+    run_task eck_up
     run_task run_evaluation
     run_task compare_results
     run_task write_evaluation_index
+    run_task eck_down
     log_info "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
 }
 

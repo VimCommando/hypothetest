@@ -134,10 +134,14 @@ The Operator does not generate or modify these assets.
 
 ## Kubernetes assets
 
-The Coordinator generates kubernetes infrastructure. The Operator consumes it
-via `generated/scripts/eck-up.sh` and `eck-down.sh`. When the provider is k3s,
-`generated/scripts/k3s-install.sh` and `k3s-uninstall.sh` handle the cluster
-lifecycle independently. Expected layout:
+The Coordinator generates kubernetes infrastructure. The generated runner
+calls `eck-up.sh` and `eck-down.sh` as lifecycle tasks, matching the compose
+convention (`compose_up` / `compose_down`). The runner passes the baseline
+variation to `eck-up.sh` via `HYPOTHETEST_VARIATION` and tracks
+`CURRENT_VARIATION` so `apply_variation` skips the redundant first apply.
+
+When the provider is k3s, `k3s-install.sh` and `k3s-uninstall.sh` handle
+the cluster lifecycle independently of ECK. Expected layout:
 
 ```text
 generated/eck/namespace.yaml
