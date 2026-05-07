@@ -108,12 +108,12 @@ Resolution order when `engine: auto`:
 
 Do not assume Docker is present.
 
-For `scope: remote`, require Coordinator readiness evidence before execution. The remote host must be reachable through the user's `.ssh/config` using SSH certificate auth, and the remote user must be able to execute the resolved compose command:
+For `scope: remote`, Coordinator readiness evidence should verify SSH reachability and compose permissions before execution. If readiness evidence is absent, the runner warns the user (see readiness warning in the validation section above) but continues. The remote host must be reachable through the user's `.ssh/config` using SSH certificate auth, and the remote user must be able to execute the resolved compose command:
 
 - `docker compose version` for Docker.
 - `podman compose version` or `podman-compose --version` for Podman.
 
-Execute compose operations on the remote host in the declared `deployment.remote.workdir`. Do not attempt remote execution when SSH access or compose permissions are unverified.
+Execute compose operations on the remote host in the declared `deployment.remote.workdir`.
 
 For remote compose, treat SSH as the deployment control plane, not the dataset transport. Do not copy raw corpus files to `deployment.remote.workdir` by default. Load data through the declared indexing/workload tool, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the remote deployment. Only stage raw data on the remote host when the blueprint explicitly declares remote data generation, a remote download, or a remote-local phase script.
 

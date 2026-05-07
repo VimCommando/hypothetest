@@ -154,14 +154,42 @@ function write_partial_evaluation() {
     local total_seconds=0
     if [[ -n "${EVAL_START_TIME:-}" ]]; then
         local start_epoch end_epoch
-        start_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${EVAL_START_TIME}" +%s 2>/dev/null || date -d "${EVAL_START_TIME}" +%s 2>/dev/null || echo 0)"
+        start_epoch="$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${EVAL_START_TIME%Z}" +%s 2>/dev/null || date -d "${EVAL_START_TIME}" +%s 2>/dev/null || echo 0)"
         end_epoch="$(date +%s)"
         total_seconds=$(( end_epoch - start_epoch ))
     fi
 
+    cp "${blueprint_root}/hypothesis.md" "${HYPOTHETEST_EVALUATION_DIR}/hypothesis.md" 2>/dev/null || true
+    cp "${HYPOTHETEST_PLAN}" "${HYPOTHETEST_EVALUATION_DIR}/hypothetest.yml" 2>/dev/null || true
+    cp "${blueprint_root}/blueprint.yml" "${HYPOTHETEST_EVALUATION_DIR}/blueprint.yml" 2>/dev/null || true
+
     local _prev_nullglob
     _prev_nullglob=$(shopt -p nullglob) || true
     shopt -s nullglob
+
+    local raw_items="" diag_items="" phase_items=""
+    for v in "${VARIATIONS[@]}"; do
+        for (( r=1; r<=REPEATS; r++ )); do
+            for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*; do
+                raw_items+="    - path: measurements/${v}/${r}/$(basename "$f")
+      kind: measurement
+      format: ${f##*.}
+"
+            done
+            for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
+                diag_items+="    - path: evidence/diagnostics/${v}/${r}/$(basename "$f")
+      kind: diagnostic
+      format: zip
+"
+            done
+            for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
+                phase_items+="    - path: evidence/phase-output/${v}/${r}/${f##*/}
+      kind: phase_output
+      format: ${f##*.}
+"
+            done
+        done
+    done
 
     {
         cat <<EOF
@@ -188,39 +216,14 @@ EOF
     variations: []
   failures:
     - "${failed_task}: exit ${exit_code}"
-evidence:
-  raw:
 EOF
-        for v in "${VARIATIONS[@]}"; do
-            for (( r=1; r<=REPEATS; r++ )); do
-                for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*; do
-                    echo "    - path: measurements/${v}/${r}/$(basename "$f")"
-                    echo "      kind: measurement"
-                    echo "      format: ${f##*.}"
-                done
-            done
-        done
-        echo "  diagnostics:"
-        for v in "${VARIATIONS[@]}"; do
-            for (( r=1; r<=REPEATS; r++ )); do
-                for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
-                    echo "    - path: evidence/diagnostics/${v}/${r}/$(basename "$f")"
-                    echo "      kind: diagnostic"
-                    echo "      format: zip"
-                done
-            done
-        done
-        echo "  phase_output:"
-        for v in "${VARIATIONS[@]}"; do
-            for (( r=1; r<=REPEATS; r++ )); do
-                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
-                    local bname="${f##*/}" ext="${f##*.}"
-                    echo "    - path: evidence/phase-output/${v}/${r}/${bname}"
-                    echo "      kind: phase_output"
-                    echo "      format: ${ext}"
-                done
-            done
-        done
+        echo "evidence:"
+        if [[ -n "${raw_items}" ]]; then echo "  raw:"; printf '%s' "${raw_items}"
+        else echo "  raw: []"; fi
+        if [[ -n "${diag_items}" ]]; then echo "  diagnostics:"; printf '%s' "${diag_items}"
+        else echo "  diagnostics: []"; fi
+        if [[ -n "${phase_items}" ]]; then echo "  phase_output:"; printf '%s' "${phase_items}"
+        else echo "  phase_output: []"; fi
         echo "  generated: []"
         echo "measurements:"
         echo "  normalized: []"
@@ -626,55 +629,42 @@ EOF
             echo "        seconds: ${vsecs}"
         done
 
-        cat <<EOF
-  failures: []
-evidence:
-  raw:
-EOF
+        echo "  failures: []"
+
+        local raw_items="" diag_items="" phase_items=""
         for v in "${VARIATIONS[@]}"; do
             for (( r=1; r<=REPEATS; r++ )); do
                 for f in "${HYPOTHETEST_MEASUREMENTS_DIR}/${v}/${r}"/*; do
+                    raw_items+="    - path: measurements/${v}/${r}/$(basename "$f")
+      kind: measurement
+      format: ${f##*.}
+"
+                done
+                for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
+                    diag_items+="    - path: evidence/diagnostics/${v}/${r}/$(basename "$f")
+      kind: diagnostic
+      format: zip
+"
+                done
+                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
                     local bname ext
                     bname="$(basename "$f")"
                     ext="${bname##*.}"
-                    echo "    - path: measurements/${v}/${r}/${bname}"
-                    echo "      kind: measurement"
-                    echo "      format: ${ext}"
+                    phase_items+="    - path: evidence/phase-output/${v}/${r}/${bname}
+      kind: phase_output
+      format: ${ext}
+"
                 done
             done
         done
 
-        echo "  diagnostics:"
-        for v in "${VARIATIONS[@]}"; do
-            for (( r=1; r<=REPEATS; r++ )); do
-                for f in "${HYPOTHETEST_DIAGNOSTICS_DIR}/${v}/${r}"/*.zip; do
-                    echo "    - path: evidence/diagnostics/${v}/${r}/$(basename "$f")"
-                    echo "      kind: diagnostic"
-                    echo "      format: zip"
-                done
-            done
-        done
-
-        echo "  phase_output:"
-        for v in "${VARIATIONS[@]}"; do
-            for (( r=1; r<=REPEATS; r++ )); do
-                for f in "${HYPOTHETEST_PHASE_OUTPUT_DIR}/${v}/${r}"/*; do
-                    local bname ext kind_fmt
-                    bname="$(basename "$f")"
-                    ext="${bname##*.}"
-                    case "${ext}" in
-                        json) kind_fmt="format: json" ;;
-                        log)  kind_fmt="format: log" ;;
-                        yml)  kind_fmt="format: yml" ;;
-                        *)    kind_fmt="format: txt" ;;
-                    esac
-                    echo "    - path: evidence/phase-output/${v}/${r}/${bname}"
-                    echo "      kind: phase_output"
-                    echo "      ${kind_fmt}"
-                done
-            done
-        done
-
+        echo "evidence:"
+        if [[ -n "${raw_items}" ]]; then echo "  raw:"; printf '%s' "${raw_items}"
+        else echo "  raw: []"; fi
+        if [[ -n "${diag_items}" ]]; then echo "  diagnostics:"; printf '%s' "${diag_items}"
+        else echo "  diagnostics: []"; fi
+        if [[ -n "${phase_items}" ]]; then echo "  phase_output:"; printf '%s' "${phase_items}"
+        else echo "  phase_output: []"; fi
         echo "  generated: []"
 
         echo "measurements:"
