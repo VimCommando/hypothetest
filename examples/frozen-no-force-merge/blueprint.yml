@@ -12,12 +12,6 @@ prerequisites:
   - esrally
   - espipe
   - esdiag
-include:
-  directories:
-    - data/
-    - tracks/
-    - templates/
-    - generated/
 datasets:
   - name: http-logs
     path: data/http_logs.ndjson

@@ -11,10 +11,6 @@ prerequisites:
   - docker or podman
   - espipe
   - esdiag
-include:
-  directories:
-    - data/
-    - generated/
 datasets:
   - name: logs
     path: data/logs.ndjson

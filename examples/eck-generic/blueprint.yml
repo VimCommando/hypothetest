@@ -15,7 +15,6 @@ prerequisites:
   - kubernetes cluster (k3s or existing)
 include:
   directories:
-    - data/
     - generated/
 datasets:
   - name: docs
