@@ -193,13 +193,13 @@ function run_task() {
     fi
 
     current_task="${task}"
-    log_info "$(green start) task $(cyan "${task}")"
+    log_milestone "$(green start) task $(cyan "${task}")"
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
-        log_info "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
+        log_milestone "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
     else
         "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1
     fi
-    log_info "$(green complete) task $(cyan "${task}")"
+    log_milestone "$(green complete) task $(cyan "${task}")"
     current_task=""
 }
 
@@ -209,7 +209,7 @@ function run_parallel() {
     local failed=0
     local index=0
 
-    log_info "$(green start) parallel group: $(cyan "${tasks[*]}")"
+    log_milestone "$(green start) parallel group: $(cyan "${tasks[*]}")"
     for task in "${tasks[@]}"; do
         (
             run_task "${task}"
@@ -233,7 +233,7 @@ function run_parallel() {
     elif [[ ${failed} -ne 0 ]]; then
         return 1
     fi
-    log_info "$(green complete) parallel group"
+    log_milestone "$(green complete) parallel group"
 }
 
 # ----- Generated Evaluation Plan -----
@@ -284,7 +284,7 @@ function command_run() {
 
     run_task compare_results
     run_task write_report
-    log_info "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
+    log_milestone "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
 }
 
 function command_report() {
@@ -293,6 +293,7 @@ function command_report() {
         log_error "Use $(white "--run-id <ID>") to specify the evaluation to regenerate"
         exit 1
     fi
+    ensure_directories
     log_milestone "Regenerating report for $(cyan "${HYPOTHETEST_RUN_ID}")"
     run_task compare_results
     run_task write_report

@@ -69,7 +69,7 @@ Entries in `experiment.constants.required` and `experiment.constants.best_effort
 
 In consult mode, also ask:
 
-- When the independent variable is a per-request parameter (bulk_size, batch_size, etc.): "Do you want to hold total in-flight units constant (e.g., total in-flight docs = bulk_size x max_requests), or hold client count constant?" The two calibration strategies produce different experiments and the choice should be explicit.
+- When the independent variable affects per-request behavior, confirm the calibration strategy for related parameters. Changing one parameter (e.g., bulk_size) may require adjusting others (e.g., max_concurrent_requests) to hold overall pressure constant. Surface this tradeoff rather than assuming a default.
 - "Do you want to capture wall-clock elapsed time per variation?" Wall-clock time is not in Rally CSV output and must be instrumented separately (e.g., `date` around the `load.sh` call). It is almost always useful for sweep experiments comparing run duration.
 
 If any required intent is missing in compile mode, fail with a short error list and the exact section that needs to be fixed. Do not invent missing scientific intent.
@@ -193,9 +193,11 @@ dataset:
 
 Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
 
-For throughput and merge experiments that do not measure query performance, prefer index-only Rally challenges (e.g., `append-no-conflicts-index-only`). The full `append-no-conflicts` challenge includes a query suite that adds significant runtime without contributing to the measurement plan.
+For throughput and merge experiments that do not measure query performance, prefer index-only Rally challenges when available. Full challenges often include query suites that add significant runtime without contributing to the measurement plan.
 
-When `bulk_size` is a parameter or varies across variations, verify warmup safety: compute `total_requests = ceil(dataset_docs / bulk_size)` and warn if the ratio to the challenge's warmup period is below 10x. A `bulk_size` that results in fewer total requests than the warmup window causes Rally to consume the entire dataset during warmup and record no throughput metric.
+When `bulk_size` is a parameter or varies across variations, verify warmup safety: compute `total_requests = ceil(dataset_docs / bulk_size)` and check that total requests comfortably exceeds the challenge's warmup period. A `bulk_size` that results in fewer total requests than the warmup window causes Rally to consume the entire dataset during warmup and record no throughput metric.
+
+Rally's CSV report format is the safe default — it is supported by both local installs and the `elastic/rally` container image. JSON report format is not universally available. When the Architect generates measurement extraction code, it should expect CSV input unless the blueprint explicitly declares otherwise.
 
 Dataset locality is defined by the loader, not by the deployment SSH target. For remote compose, local input files, Rally tracks, and espipe inputs remain on the machine running the loader unless the dataset explicitly declares that the Operator must generate the data on the remote host. The SSH host does not receive a copy of raw corpus files as part of normal remote deployment setup.
 
@@ -350,7 +352,7 @@ If a metric source is unclear, keep the metric but mark it as unresolved in `gen
 
 Use `esdiag` as the default Elasticsearch diagnostic collector. Scenario diagnostics are YAML configuration, not JSON. Allow each collection point to declare a specific API list under `measure.diagnostics`.
 
-The `apis` list in `measure.diagnostics.at` declares which API responses must be present in the esdiag collection output. These are verification targets, not arguments passed to `esdiag --include`. The Operator verifies after collection that each listed API has a corresponding file in the unzipped esdiag bundle. The default esdiag collection already includes `nodes_stats`, `indices_stats`, and `cluster_health`; only list APIs that go beyond the default set if the measurement plan requires them:
+The `apis` list in `measure.diagnostics.at` declares which API responses the measurement plan requires. The Operator should verify after collection that each listed API has a corresponding file in the unzipped esdiag bundle. Note that esdiag's `--include` flag may use its own named identifiers rather than raw ES API paths — the Operator resolves the mapping. The default esdiag collection already includes `nodes_stats`, `indices_stats`, and `cluster_health`; only list APIs that go beyond the default set if the measurement plan requires them:
 
 ```yaml
 measure:
@@ -426,7 +428,7 @@ Before finalizing a blueprint:
 - Primary metrics are declared.
 - Metric sources are plausible.
 - Elasticsearch diagnostic metric sources use `esdiag` collections with explicit API lists.
-- When `bulk_size` is a parameter, `total_requests = ceil(dataset_docs / bulk_size)` is at least 10x the warmup period for every variation.
+- When `bulk_size` is a parameter, `total_requests = ceil(dataset_docs / bulk_size)` comfortably exceeds the warmup period for every variation.
 - Compose hypotheses include engine handling: `auto`, `docker`, or `podman`.
 - Compose hypotheses declare `scope: local` or `scope: remote`.
 - Remote compose hypotheses declare SSH certificate auth and require Coordinator readiness validation.
