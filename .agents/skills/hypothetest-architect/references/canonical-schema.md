@@ -94,6 +94,12 @@ Use `experiment.constants.required` for controls that must match exactly, and
 closely as the target allows. Do not put the same factor in constants and
 variables.
 
+Each entry in `constants.required`, `constants.best_effort`, and `variables` is
+a factor name (string), not a key-value pair. The factor's value is declared
+elsewhere in the plan (deployment, dataset, variation config). For example,
+`elasticsearch_version` as a required constant means "this factor is held
+fixed"; the actual version value lives in `deployment.elasticsearch.version`.
+
 Keep `compare.changed` and `compare.controls` empty unless backward
 compatibility or a downstream consumer still requires them. New plans should use
 `experiment.variables` and `experiment.constants` as the source of truth. The
