@@ -26,7 +26,6 @@ Operator skill's bundled `schemas/evaluation.schema.yaml`.
 Expected files:
 
 - `evaluation.yml`
-- `manifest.toon`
 - `hypothesis.md`
 - `hypothetest.yml`
 - variation/repeat artifacts
@@ -43,6 +42,7 @@ Supported command aliases:
 Create or update:
 
 ```text
+manifest.toon
 report.md
 summary.toon
 comparison.toon
@@ -55,7 +55,7 @@ Write outputs into the evaluation directory unless the user explicitly requests 
 
 ## Analysis workflow
 
-1. Load `evaluation.yml`, `manifest.toon`, and the canonical plan.
+1. Load `evaluation.yml` and the canonical plan. Generate `manifest.toon` from the evaluation manifest section.
 2. Identify the experiment intent, constants, variables, baseline, and candidate variations.
 3. Verify all expected variations, repeats, and phases completed.
 4. Check whether required constants were preserved and whether best-effort constants were approximated or platform-managed.

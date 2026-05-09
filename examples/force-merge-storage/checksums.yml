@@ -1,0 +1,6 @@
+algorithm: sha256
+files:
+  blueprint.yml: 56df1de502a74e9aaa4f8e214d40eb5e90adb9074387399fede0ace78a7473c6
+  hypothesis.md: 792be22065757a54324ac912e951ce0656ff5ba03518a6296ee5bd78000ff063
+  hypothetest.yml: 95d1f97fbcd9f45555e5c73d1af061764a6e533ab9cea31573f04abd5684bdd5
+  README.md: 3208b96ec17fcc37798c9347aa597ca363a07ada3e0088fc8dd2038c160f995b
