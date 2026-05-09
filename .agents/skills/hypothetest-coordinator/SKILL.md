@@ -396,6 +396,7 @@ only the files relevant to the current blueprint.
 - `references/tools/helm.md` — when `deployment.target: kubernetes`
 - `references/tools/k3s.md` — when `deployment.kubernetes.provider` resolves to `k3s`
 - `references/tools/jq.md` — when `diagnostics.during` is declared
+- `references/tools/ssh.md` — when `deployment.scope: remote`
 
 **Loaded by prescribed method or profile:**
 - `references/tools/perf.md` — when `on_cpu` method is prescribed
