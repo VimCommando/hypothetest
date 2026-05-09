@@ -104,7 +104,7 @@ measure:
     tool: esdiag
     at:
       after_phase:
-        apis:
+        required_apis:
           - _nodes/stats
           - _stats
           - _cat/segments?format=json

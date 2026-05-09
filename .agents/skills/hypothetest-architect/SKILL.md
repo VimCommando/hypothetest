@@ -352,7 +352,7 @@ If a metric source is unclear, keep the metric but mark it as unresolved in `gen
 
 Use `esdiag` as the default Elasticsearch diagnostic collector. Scenario diagnostics are YAML configuration, not JSON. Allow each collection point to declare a specific API list under `measure.diagnostics`.
 
-The `apis` list in `measure.diagnostics.at` declares which API responses the measurement plan requires. The Operator should verify after collection that each listed API has a corresponding file in the unzipped esdiag bundle. Note that esdiag's `--include` flag may use its own named identifiers rather than raw ES API paths — the Operator resolves the mapping. The default esdiag collection already includes `nodes_stats`, `indices_stats`, and `cluster_health`; only list APIs that go beyond the default set if the measurement plan requires them:
+The `required_apis` list in `measure.diagnostics.at` declares which API responses the measurement plan requires in the collection output. The Operator verifies coverage after collection and resolves esdiag identifier mapping when using `--include`. The default esdiag collection already includes `nodes_stats`, `indices_stats`, and `cluster_health`; only list APIs that go beyond the default set if the measurement plan requires them:
 
 ```yaml
 measure:
@@ -362,15 +362,15 @@ measure:
       target: optional-results-cluster
     at:
       before_phase:
-        apis:
-          - _cluster/health
-          - _nodes/stats
-          - _stats
+        required_apis:
+          - cluster_health
+          - nodes_stats
+          - indices_stats
       after_phase:
-        apis:
-          - _nodes/stats
-          - _stats
-          - _cat/segments?format=json
+        required_apis:
+          - nodes_stats
+          - indices_stats
+          - cat_segments
 ```
 
 The Architect should include these API lists in `generated/metrics-plan.yml` and ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.

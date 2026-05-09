@@ -99,7 +99,7 @@ diagnostic_collections:
 
   before_load:
     trigger: before load_data phase
-    apis:
+    required_apis:
       - _cluster/health
       - _nodes/stats
       - _cat/nodes?v&format=json
@@ -109,7 +109,7 @@ diagnostic_collections:
 
   after_load:
     trigger: after load_data phase, before force_merge phase
-    apis:
+    required_apis:
       - _nodes/stats
       - _stats
       - _cat/segments?format=json
@@ -121,7 +121,7 @@ diagnostic_collections:
 
   after_force_merge:
     trigger: after collect_store_after_force_merge phase
-    apis:
+    required_apis:
       - _nodes/stats
       - _stats
       - _cat/segments?format=json

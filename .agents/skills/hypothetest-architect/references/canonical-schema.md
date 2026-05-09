@@ -63,9 +63,9 @@ measure:
     tool: esdiag
     at:
       before_phase:
-        apis:
-          - _cluster/health
-          - _nodes/stats
+        required_apis:
+          - cluster_health
+          - nodes_stats
     during:
       profile: standard
 compare:

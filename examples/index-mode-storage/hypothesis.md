@@ -223,20 +223,20 @@ measure:
     tool: esdiag
     at:
       before_load:
-        apis:
+        required_apis:
           - _cluster/health
           - _nodes/stats
           - _cat/nodes?v&format=json
 
       after_load:
-        apis:
+        required_apis:
           - _nodes/stats
           - _stats
           - _cat/segments?format=json
           - _cat/indices?v&format=json
 
       after_force_merge:
-        apis:
+        required_apis:
           - _nodes/stats
           - _stats
           - _cat/segments?format=json

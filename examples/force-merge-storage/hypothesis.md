@@ -102,11 +102,11 @@ measure:
     tool: esdiag
     at:
       before_phase:
-        apis:
+        required_apis:
           - _cluster/health
           - _nodes/stats
       after_phase:
-        apis:
+        required_apis:
           - _nodes/stats
           - _stats
           - _cat/segments?format=json
