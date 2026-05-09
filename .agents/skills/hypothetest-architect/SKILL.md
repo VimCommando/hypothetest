@@ -447,6 +447,18 @@ When schema-validating generated YAML, use the Rust `yaml-schema` package instal
 
 Return concrete files or patches when possible. Avoid abstract brainstorming once enough information exists. If information is missing, ask for the smallest number of decisions needed to make progress.
 
+## Next steps
+
+When the blueprint is complete and validated, tell the user:
+
+1. **Hand off to the Coordinator** to bind the blueprint to their
+   environment: `"The blueprint is ready. Next, use the Coordinator
+   skill to run readiness checks and generate deployment scripts for
+   your environment."`
+2. Summarize what the Coordinator will need to verify: deployment
+   target, tool availability, dataset access, and any privileged
+   commands declared in evaluation.sh.
+
 ## References
 
 - `references/scenario-format.md`

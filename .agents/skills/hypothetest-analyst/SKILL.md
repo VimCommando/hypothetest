@@ -371,6 +371,22 @@ observations into the analysis:
 - For compose evaluations, explicitly state that results are development-grade and should not be treated as production performance evidence.
 - Mention likely confounders such as cache state, noisy local resources, repository variability, JVM warmup, shard allocation, repeat count, and state leakage.
 
+## Next steps
+
+When the report is complete, tell the user:
+
+1. **Review the report** and highlight the key finding: was the
+   hypothesis supported, refuted, or inconclusive?
+2. **Suggest next actions** based on the result:
+   - Supported: consider applying the change, validating at larger
+     scale, or testing in a production-like environment.
+   - Refuted: suggest alternative hypotheses or parameters to explore.
+   - Inconclusive: recommend additional repeats, tighter controls, or
+     different measurement approaches.
+3. **Archive or re-run**: `"Full evaluation artifacts are at
+   <HYPOTHETEST_EVALUATION_DIR>. To regenerate the report later:
+   ./generated/scripts/evaluation.sh report --run-id <ID>"`
+
 ## References
 
 - `references/report-template.md`

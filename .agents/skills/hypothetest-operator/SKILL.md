@@ -440,6 +440,21 @@ Partial evaluations are valid Analyst inputs as long as `evaluation.yml` records
 - Write the exact commands used.
 - Prefer idempotent scripts.
 
+## Next steps
+
+When the evaluation completes (or partially completes), tell the user:
+
+1. **Hand off to the Analyst** to interpret results:
+   `"Evaluation complete. Use the Analyst skill to normalize
+   measurements, run comparisons, and generate the report."`
+2. Point to the evaluation directory:
+   `"Artifacts are at <HYPOTHETEST_EVALUATION_DIR>. The Analyst
+   will read evaluation.yml as its starting point."`
+3. If the evaluation failed or was partial, note which variations
+   completed and which evidence is available for analysis.
+4. To regenerate comparison and report from existing data:
+   `./generated/scripts/evaluation.sh report --run-id <ID>`
+
 ## References
 
 - `references/artifacts.md`

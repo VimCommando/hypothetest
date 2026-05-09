@@ -163,7 +163,7 @@ When the cluster is reachable, run an esdiag smoke test before handoff:
 
 When diagnostics provide primary or required secondary metrics, a failed smoke test is a blocker. When diagnostics are optional, a failed smoke test is `ready_with_warnings` — the readiness output must say which metrics will be unavailable.
 
-For privileged commands used by the evaluation (e.g., `sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'`), verify `sudo -n` works for each one. The Architect should declare privileged commands in evaluation.sh (e.g., in a comment header). The Coordinator verifies the declared list rather than extracting commands from bash source.
+For privileged commands used by the evaluation (e.g., `sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'`), verify `sudo -n` works for each one. The Architect should declare privileged commands in evaluation.sh (e.g., in a comment header). The Coordinator verifies the declared list rather than extracting commands from bash source. When any `sudo -n` check fails, load `references/privilege-setup.md` and present the remediation options to the user.
 
 ## Scenario-specific checks
 
@@ -402,6 +402,9 @@ only the files relevant to the current blueprint.
 - `references/tools/bpftrace.md` — when `off_cpu` method is prescribed
 - `references/tools/sysstat.md` — when `standard` or `comprehensive` profile on Linux
 
+**Loaded by readiness result:**
+- `references/privilege-setup.md` — when any `sudo -n` check fails for declared privileged commands
+
 #### Generation references
 
 - **Always:** `references/script-templates.md` (skeleton, collection catalog)
@@ -418,6 +421,19 @@ Before declaring the handoff complete, run `evaluation.sh plan` and
 generated script parses correctly and resolves environment variables
 without executing any tasks. If either command fails, the generated
 assets have a problem that should be fixed before the Operator runs.
+
+## Next steps
+
+When readiness is confirmed and handoff verification passes, tell the user:
+
+1. **Run the evaluation** with the Operator skill:
+   `"Readiness confirmed. Run the evaluation with the Operator skill:
+   ./generated/scripts/evaluation.sh run"`
+2. Mention key options: `--dry-run` to verify without executing,
+   `--quiet` for milestone-only output, `--env .env` if a generated
+   env file was created.
+3. If any readiness items were `ready_with_warnings`, remind the user
+   which metrics or features will be unavailable.
 
 ## Boundary rules
 
