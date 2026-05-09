@@ -154,7 +154,16 @@ For `esdiag`, verify the full diagnostics credential path before execution:
 - results-cluster endpoint and auth material are present when `measure.diagnostics.results` is configured.
 - the expected `esdiag collect` or `esdiag process` preflight can run non-destructively from the same environment that will execute the evaluation.
 
-If diagnostics provide primary or required secondary metrics, missing esdiag credentials are blockers, not warnings. If diagnostics are optional, missing esdiag access may be `ready_with_warnings`, but the readiness output must say which metrics will be unavailable.
+When the cluster is reachable, run an esdiag smoke test before handoff:
+
+1. Register the cluster as a named host: `esdiag host add <name> elasticsearch <url>`.
+2. Run `esdiag collect <name> <tmpdir>` to verify collection works end-to-end.
+3. Unzip the output bundle and verify at least one expected file exists (e.g., `nodes_stats.json`).
+4. Record the registered esdiag host name in readiness.toon and in the generated `.env`.
+
+When diagnostics provide primary or required secondary metrics, a failed smoke test is a blocker. When diagnostics are optional, a failed smoke test is `ready_with_warnings` — the readiness output must say which metrics will be unavailable.
+
+For privileged commands used by the evaluation (e.g., `sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'`), verify `sudo -n` works for each one. The Architect should declare privileged commands in evaluation.sh (e.g., in a comment header). The Coordinator verifies the declared list rather than extracting commands from bash source.
 
 ## Scenario-specific checks
 
@@ -167,7 +176,8 @@ For `compose`:
 - If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
 - If `deployment.scope` is `remote`, do not require raw dataset files to exist on the SSH host. Verify dataset access where the declared loader will run. The SSH host normally receives compose assets and runtime support files only; raw data reaches Elasticsearch through `espipe`, Rally/esrally, or another declared indexing phase.
 - If the scenario explicitly declares remote data generation, remote downloads, or a remote-local script phase, verify only those remote data prerequisites.
-- Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host.
+- Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host. When available host memory significantly exceeds the compose defaults (`ES_HEAP=2g`, `ES_MEMORY=4g`), note available resources in readiness.toon and recommend scaled values. Do not auto-apply — present the recommendation and let the user confirm.
+- When the measurement plan does not include query metrics, recommend index-only Rally challenges if available for the declared track. Note the runtime difference compared to full challenges that include query suites.
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
 - Confirm generated volume and repository paths are repo-local or clearly declared.
 
@@ -325,9 +335,19 @@ selects and fills patterns from the reference catalog.
 | `generated/scripts/reset.sh` | Variation reset (delete indices, clear caches) | calling convention contract |
 | `generated/scripts/load.sh` | Dataset loading wrapper | calling convention contract |
 
+`load.sh` is the environment-specific loader wrapper. The Architect's
+compiled `evaluation.sh` must delegate all dataset loading to `load.sh`
+rather than inlining loader calls. If the Coordinator finds direct
+`esrally` or `espipe` calls in the Architect's `evaluation.sh`, note
+the issue in readiness and patch the calls to delegate to `load.sh`.
+
 Also generate `generated/compose/` (compose.yml, .env, elasticsearch.yml)
 or `generated/eck/` (namespace.yaml, elasticsearch.yaml, optionally
 kibana.yaml) for the declared deployment target.
+
+Generated `hypothetest.yml` should include a `$schema` key pointing to
+the Coordinator's schema so that `ys hypothetest.yml` works without an
+explicit `-f` flag.
 
 ### Script calling convention
 
@@ -390,6 +410,14 @@ only the files relevant to the current blueprint.
 - **diagnostics.during declared:** `references/observation-methods.md`
 
 Never load both compose and ECK reference sets simultaneously.
+
+## Handoff verification
+
+Before declaring the handoff complete, run `evaluation.sh plan` and
+`evaluation.sh env` as a dry-run integration check. This verifies the
+generated script parses correctly and resolves environment variables
+without executing any tasks. If either command fails, the generated
+assets have a problem that should be fixed before the Operator runs.
 
 ## Boundary rules
 

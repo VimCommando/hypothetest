@@ -263,23 +263,51 @@ Collect raw metrics before summarizing. Use `esdiag` as the default Elasticsearc
 
 Before any phase that can destroy or reset the only recoverable copy of state, run a diagnostics preflight for every configured collection path. For `esdiag`, verify the same runtime environment that will execute collection has the required endpoint credentials, source files, keystore access, and `ESDIAG_KEYSTORE_PASSWORD` when an encrypted keystore is used. If diagnostics provide primary metrics or required evidence, a failed preflight is a hard stop before destructive reset or teardown.
 
-For each configured collection point, execute `esdiag collect` with the scenario's YAML-defined API list or source definition. Use `--sources <path/to/sources.yml>` when the collection endpoints must follow a generated source file. Preserve the raw `esdiag` diagnostic bundle as its `.zip` artifact; do not convert raw API outputs to TOON.
+For each configured collection point, execute `esdiag collect` against the
+registered named host. Use `--sources <path/to/sources.yml>` when the
+collection endpoints must follow a generated source file. Preserve the raw
+`esdiag` diagnostic bundle as its `.zip` artifact; do not convert raw API
+outputs to TOON. See `references/esdiag-operations.md` for `esdiag` syntax,
+named-host requirements, and output format details.
 
-Default Elasticsearch API collection around each phase:
+Default Elasticsearch APIs to verify in collection output:
 
-- `_cluster/health`
-- `_nodes/stats`
-- `_stats`
-- `_cat/segments?format=json`
-- `_cat/indices?format=json`
+- `cluster_health`
+- `nodes_stats`
+- `indices_stats`
+- `cat_segments`
+- `cat_indices`
+
+These are the APIs the measurement plan typically requires, expressed as
+esdiag bundle filenames (not raw ES paths). After unzipping the collection
+bundle, verify these files exist. The default `esdiag collect` type covers
+most of them; use `--include` only after confirming an API is missing from
+the default collection and verifying the correct esdiag identifier via
+`esdiag collect --help`.
 
 For force-merge phases, collect segment and store stats before and after.
 
 For snapshot/frozen-like phases, collect repository/snapshot information when available.
 
-If a scenario provides `measure.diagnostics.at`, honor those API lists exactly for that collection point. Do not add broader diagnostics unless the plan explicitly requests them.
+If a scenario provides `measure.diagnostics.at`, ensure the collection
+covers every API in that list. The list declares what the measurement plan
+requires in the output — verify coverage after collection rather than
+blindly passing entries to `--include`, since esdiag identifiers may differ
+from raw ES API paths. Do not add broader diagnostics unless the plan
+explicitly requests them.
 
 If the scenario configures a diagnostics results target, execute `esdiag process` to ship the bundle to that results cluster and record the destination in the evaluation manifest.
+
+When a collection step produces deeply nested raw output (e.g., full
+`nodes_stats` responses), the teardown or post-collection task should emit a
+flat summary with key deltas relevant to the measurement plan. Summarize
+fields that changed between before/after snapshots rather than preserving
+the full nested structure. Do not hardcode field names — derive them from
+the measurement plan's metric declarations.
+
+When running in dry-run mode, start and immediately stop any background
+pollers or sampling processes to verify they initialize and terminate
+cleanly without blocking.
 
 Store Hypothetest's own derived metric rows as TOON (`.toon`), not JSON or CSV. Normalize metric records where possible to TOON rows shaped like:
 
@@ -415,3 +443,4 @@ Partial evaluations are valid Analyst inputs as long as `evaluation.yml` records
 ## References
 
 - `references/artifacts.md`
+- `references/esdiag-operations.md` — load when blueprint uses `measure.diagnostics.tool: esdiag`
