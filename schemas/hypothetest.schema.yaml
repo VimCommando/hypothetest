@@ -198,6 +198,7 @@ $defs:
             enum:
               - existing
               - k3s
+              - k3d
           operator_version:
             type: string
           install_operator:

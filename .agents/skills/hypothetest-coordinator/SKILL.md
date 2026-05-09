@@ -186,12 +186,13 @@ For `kubernetes`:
 Kubernetes provider detection and confirmation:
 
 - Run `kubectl cluster-info` to detect an existing cluster.
-- If `deployment.kubernetes.provider` is declared, validate it. If `existing` and no cluster found, mark readiness `blocked`. If `k3s` and cluster already found, skip k3s install.
+- If `deployment.kubernetes.provider` is declared, validate it. If `existing` and no cluster found, mark readiness `blocked`. If `k3s` and cluster already found, skip k3s install. If `k3d` and Docker not running, mark readiness `blocked`.
 - If `deployment.kubernetes.provider` is omitted, ask the user:
-  - **Cluster found:** "I found Kubernetes cluster `<context-name>` at `<endpoint>`. I'll create a `hypothetest` namespace and deploy ECK there. Is this the right cluster? If you'd rather use an isolated throwaway, I can install k3s instead."
-  - **No cluster found:** "No Kubernetes cluster detected. I can install k3s — a lightweight single-node Kubernetes that runs as a system service. Clean removal with `k3s-uninstall.sh` when you're done. Proceed?"
-- When provider is explicitly declared, skip the question but still echo what you're targeting before acting ("Using existing cluster `<context>` at `<endpoint>`" or "Installing k3s as declared").
-- Record the resolved provider in readiness.toon as `kubernetes_provider: existing` or `kubernetes_provider: k3s`.
+  - **Cluster found:** "I found Kubernetes cluster `<context-name>` at `<endpoint>`. I'll create a `hypothetest` namespace and deploy ECK there. Is this the right cluster? If you'd rather use an isolated throwaway, I can install k3s (Linux) or k3d (macOS/Linux, runs in Docker) instead."
+  - **No cluster found (macOS):** "No Kubernetes cluster detected. I can create a k3d cluster — k3s running inside Docker containers. Clean removal with `k3d-uninstall.sh` when you're done. Proceed?"
+  - **No cluster found (Linux):** "No Kubernetes cluster detected. I can install k3s — a lightweight single-node Kubernetes that runs as a system service. Clean removal with `k3s-uninstall.sh` when you're done. Or use k3d if you prefer Docker-based isolation. Proceed?"
+- When provider is explicitly declared, skip the question but still echo what you're targeting before acting ("Using existing cluster `<context>` at `<endpoint>`", "Installing k3s as declared", or "Creating k3d cluster as declared").
+- Record the resolved provider in readiness.toon as `kubernetes_provider: existing`, `kubernetes_provider: k3s`, or `kubernetes_provider: k3d`.
 
 Kubernetes readiness checks (after provider is resolved):
 
@@ -329,6 +330,8 @@ selects and fills patterns from the reference catalog.
 | `generated/scripts/compose-down.sh` | Stop cluster (compose target) | compose templates |
 | `generated/scripts/k3s-install.sh` | Install k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
 | `generated/scripts/k3s-uninstall.sh` | Remove k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
+| `generated/scripts/k3d-install.sh` | Create k3d cluster (kubernetes target, provider: k3d) | `references/tools/k3d.md` |
+| `generated/scripts/k3d-uninstall.sh` | Delete k3d cluster (kubernetes target, provider: k3d) | `references/tools/k3d.md` |
 | `generated/scripts/eck-up.sh` | Start cluster (kubernetes target) | `references/eck-templates.md` |
 | `generated/scripts/eck-down.sh` | Stop cluster (kubernetes target) | `references/eck-templates.md` |
 | `generated/scripts/sample.sh` | During-phase observation | `references/script-templates.md` |
@@ -395,6 +398,7 @@ only the files relevant to the current blueprint.
 - `references/tools/kubectl.md` — when `deployment.target: kubernetes`
 - `references/tools/helm.md` — when `deployment.target: kubernetes`
 - `references/tools/k3s.md` — when `deployment.kubernetes.provider` resolves to `k3s`
+- `references/tools/k3d.md` — when `deployment.kubernetes.provider` resolves to `k3d`
 - `references/tools/jq.md` — when `diagnostics.during` is declared
 - `references/tools/ssh.md` — when `deployment.scope: remote`
 

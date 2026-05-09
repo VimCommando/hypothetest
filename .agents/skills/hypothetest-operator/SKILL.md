@@ -140,8 +140,8 @@ convention (`compose_up` / `compose_down`). The runner passes the baseline
 variation to `eck-up.sh` via `HYPOTHETEST_VARIATION` and tracks
 `CURRENT_VARIATION` so `apply_variation` skips the redundant first apply.
 
-When the provider is k3s, `k3s-install.sh` and `k3s-uninstall.sh` handle
-the cluster lifecycle independently of ECK. Expected layout:
+When the provider is k3s or k3d, provider-specific install/uninstall scripts
+handle the cluster lifecycle independently of ECK. Expected layout:
 
 ```text
 generated/eck/namespace.yaml
@@ -151,6 +151,8 @@ generated/scripts/eck-up.sh
 generated/scripts/eck-down.sh
 generated/scripts/k3s-install.sh   (only when provider: k3s)
 generated/scripts/k3s-uninstall.sh (only when provider: k3s)
+generated/scripts/k3d-install.sh   (only when provider: k3d)
+generated/scripts/k3d-uninstall.sh (only when provider: k3d)
 ```
 
 The Operator does not generate or modify these assets.
