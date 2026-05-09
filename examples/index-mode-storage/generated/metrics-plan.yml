@@ -100,9 +100,9 @@ diagnostic_collections:
   before_load:
     trigger: before load_data phase
     required_apis:
-      - _cluster/health
-      - _nodes/stats
-      - _cat/nodes?v&format=json
+      - cluster_health
+      - nodes_stats
+      - cat_nodes
     purpose: >
       Baseline cluster state before any indexing. Captures node resource
       state and confirms cluster is green before each variation evaluation.
@@ -110,10 +110,10 @@ diagnostic_collections:
   after_load:
     trigger: after load_data phase, before force_merge phase
     required_apis:
-      - _nodes/stats
-      - _stats
-      - _cat/segments?format=json
-      - _cat/indices?v&format=json
+      - nodes_stats
+      - indices_stats
+      - cat_segments
+      - cat_indices
     purpose: >
       Post-load cluster state. Captures indexing stats, segment counts,
       and store sizes before force-merge. Used to derive store_size_after_load
@@ -122,10 +122,10 @@ diagnostic_collections:
   after_force_merge:
     trigger: after collect_store_after_force_merge phase
     required_apis:
-      - _nodes/stats
-      - _stats
-      - _cat/segments?format=json
-      - _cat/indices?v&format=json
+      - nodes_stats
+      - indices_stats
+      - cat_segments
+      - cat_indices
     purpose: >
       Post-force-merge cluster state. Primary source for store_size_after_force_merge
       cross-check. Captures final segment layout and store sizes.

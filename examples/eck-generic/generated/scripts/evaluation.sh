@@ -37,11 +37,18 @@ function white()     { echo_color 97 "${@}"; }
 function timestamp() { date -u +"%Y-%m-%d %H:%M:%S"; }
 function log_error() { echo "[$(timestamp) $(red Error) ${log_name}] ${*}"; }
 function log_warn()  { echo "[$(timestamp) $(yellow Warn)  ${log_name}] ${*}"; }
-function log_info()  { echo "[$(timestamp) $(green Info)  ${log_name}] ${*}"; }
+function log_info() {
+    if [[ ${quiet} == "true" ]]; then return 0; fi
+    echo "[$(timestamp) $(green Info)  ${log_name}] ${*}"
+}
 function log_debug() {
+    if [[ ${quiet} == "true" ]]; then return 0; fi
     if [[ ${LOG_LEVEL:-info} == "debug" ]]; then
         echo "[$(timestamp) $(blue Debug) ${log_name}] ${*}"
     fi
+}
+function log_milestone() {
+    echo "[$(timestamp) $(cyan Mile)  ${log_name}] ${*}"
 }
 
 # ----- Help Functions -----
@@ -60,6 +67,7 @@ function print_help_main() {
     echo
     white "Commands:\n"
     echo "    $(green run)       Execute the compiled evaluation plan"
+    echo "    $(green report)    Regenerate comparison and report from existing measurements"
     echo "    $(green plan)      Print the generated task plan"
     echo "    $(green env)       Print resolved environment configuration"
     echo "    $(green help)      Print help for this script"
@@ -70,6 +78,8 @@ function print_help_main() {
     echo "    -r, --run-id <ID>      Stable run identifier"
     echo "    -n, --dry-run          Print commands without executing task bodies"
     echo "    -d, --debug            Enable debug logging"
+    echo "    -q, --quiet            Suppress info/debug output; show milestones and errors only"
+    echo "        --keep-going       Continue independent task groups after failures"
     echo "        --no-color         Disable colorized output"
     echo "        --seed <INT>       Randomization seed (default: derived from run-id)"
     echo "        --version          Print template version"
@@ -78,7 +88,7 @@ function print_help_main() {
 
 # ----- Environment Configuration -----
 
-declare template_version="0.1.0"
+declare template_version="0.2.0"
 declare script_dir
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 declare blueprint_root
@@ -86,6 +96,8 @@ blueprint_root="$(cd "${script_dir}/../.." && pwd)"
 
 declare env_file=""
 declare command="run"
+declare keep_going="false"
+declare quiet="false"
 declare seed=""
 
 export LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -285,13 +297,13 @@ function run_task() {
     fi
 
     current_task="${task}"
-    log_info "$(green start) task $(cyan "${task}")"
+    log_milestone "$(green start) task $(cyan "${task}")"
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
-        log_info "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
+        log_milestone "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
     else
         "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1
     fi
-    log_info "$(green complete) task $(cyan "${task}")"
+    log_milestone "$(green complete) task $(cyan "${task}")"
     current_task=""
 }
 
@@ -735,7 +747,20 @@ function command_run() {
     run_task compare_results
     run_task write_evaluation_index
     run_task eck_down
-    log_info "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
+    log_milestone "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
+}
+
+function command_report() {
+    if [[ ! -d ${HYPOTHETEST_EVALUATION_DIR} ]]; then
+        log_error "Evaluation directory $(magenta "${HYPOTHETEST_EVALUATION_DIR}") not found"
+        log_error "Use $(white "--run-id <ID>") to specify the evaluation to regenerate"
+        exit 1
+    fi
+    ensure_directories
+    log_milestone "Regenerating report for $(cyan "${HYPOTHETEST_RUN_ID}")"
+    run_task compare_results
+    run_task write_evaluation_index
+    log_milestone "Report artifacts updated at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
 }
 
 # ----- Process command line arguments -----
@@ -744,7 +769,7 @@ if [[ $# -gt 0 ]]; then
     command="${1}" && shift
 fi
 
-if [[ ! ${command} =~ ^(run|plan|env|help|-?-?h(elp)?)$ ]]; then
+if [[ ! ${command} =~ ^(run|report|plan|env|help|-?-?h(elp)?)$ ]]; then
     log_error "Invalid command $(magenta "${command}")"
     print_help_main
     exit 1
@@ -767,6 +792,14 @@ while [[ $# -gt 0 ]]; do
         ;;
         -n|--dry-run)
             export HYPOTHETEST_DRY_RUN="true"
+            shift
+        ;;
+        -q|--quiet)
+            quiet="true"
+            shift
+        ;;
+        --keep-going)
+            keep_going="true"
             shift
         ;;
         -o|--output)
@@ -828,5 +861,8 @@ case "${command}" in
     ;;
     "run" )
         command_run
+    ;;
+    "report" )
+        command_report
     ;;
 esac

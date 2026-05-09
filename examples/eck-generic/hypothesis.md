@@ -146,15 +146,15 @@ measure:
     at:
       before_load:
         required_apis:
-          - _cluster/health
-          - _nodes/stats
-          - _cat/nodes?v&format=json
+          - cluster_health
+          - nodes_stats
+          - cat_nodes
       after_load:
         required_apis:
-          - _nodes/stats
-          - _stats
-          - _cat/segments?format=json
-          - _cat/indices?v&format=json
+          - nodes_stats
+          - indices_stats
+          - cat_segments
+          - cat_indices
 
 compare:
   baseline: default-heap

@@ -103,13 +103,13 @@ measure:
     at:
       before_phase:
         required_apis:
-          - _cluster/health
-          - _nodes/stats
+          - cluster_health
+          - nodes_stats
       after_phase:
         required_apis:
-          - _nodes/stats
-          - _stats
-          - _cat/segments?format=json
+          - nodes_stats
+          - indices_stats
+          - cat_segments
 compare:
   baseline: named_volume
   candidates:

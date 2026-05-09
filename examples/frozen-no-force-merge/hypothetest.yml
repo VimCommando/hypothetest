@@ -105,9 +105,9 @@ measure:
     at:
       after_phase:
         required_apis:
-          - _nodes/stats
-          - _stats
-          - _cat/segments?format=json
+          - nodes_stats
+          - indices_stats
+          - cat_segments
 
 compare:
   baseline: force_merged
