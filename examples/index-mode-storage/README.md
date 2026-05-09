@@ -55,7 +55,7 @@ generated/
 
 ## Expected Runtime
 
-~75 minutes (3 repeats × 5 variations)
+~60 minutes (3 repeats × 5 variations)
 
 ## Grade
 

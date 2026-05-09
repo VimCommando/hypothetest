@@ -6,20 +6,21 @@ set -euo pipefail
 SSH_HOST="ironhide.local"
 REMOTE_WORKDIR="/tmp/hypothetest/evaluations"
 COMPOSE_DIR="generated/compose"
+COMPOSE_ENGINE="${HYPOTHETEST_COMPOSE_ENGINE:-podman-compose}"
 
-echo "[teardown] engine=podman host=${SSH_HOST} status=start"
+echo "[teardown] engine=${COMPOSE_ENGINE} host=${SSH_HOST} status=start"
 
 if [[ "${HYPOTHETEST_DRY_RUN:-false}" == "true" ]]; then
-  echo "[teardown] engine=podman host=${SSH_HOST} status=complete dry_run=true"
+  echo "[teardown] engine=${COMPOSE_ENGINE} host=${SSH_HOST} status=complete dry_run=true"
   exit 0
 fi
 
 TEARDOWN_EXIT=0
-ssh "${SSH_HOST}" "cd ${REMOTE_WORKDIR} && podman-compose -f ${COMPOSE_DIR}/compose.yml down -v" || TEARDOWN_EXIT=$?
+ssh "${SSH_HOST}" "cd ${REMOTE_WORKDIR} && ${COMPOSE_ENGINE} -f ${COMPOSE_DIR}/compose.yml down -v" || TEARDOWN_EXIT=$?
 
 if [[ "${TEARDOWN_EXIT}" -ne 0 ]]; then
-  echo "[teardown] engine=podman host=${SSH_HOST} status=failed exit=${TEARDOWN_EXIT}"
+  echo "[teardown] engine=${COMPOSE_ENGINE} host=${SSH_HOST} status=failed exit=${TEARDOWN_EXIT}"
   exit "${TEARDOWN_EXIT}"
 fi
 
-echo "[teardown] engine=podman host=${SSH_HOST} status=complete"
+echo "[teardown] engine=${COMPOSE_ENGINE} host=${SSH_HOST} status=complete"

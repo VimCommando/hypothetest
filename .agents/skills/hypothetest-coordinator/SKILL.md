@@ -435,6 +435,15 @@ When readiness is confirmed and handoff verification passes, tell the user:
 3. If any readiness items were `ready_with_warnings`, remind the user
    which metrics or features will be unavailable.
 
+## References
+
+- `references/compose-templates.md` — compose deployment patterns and lifecycle scripts
+- `references/eck-templates.md` — ECK CRD patterns, kustomize overlays, and lifecycle scripts
+- `references/script-templates.md` — evaluation, load, reset, and sample script conventions
+- `references/observation-methods.md` — full method catalog for during-phase observation *(source of truth)*
+- `references/privilege-setup.md` — privilege escalation and sysctl configuration
+- `references/tools/` — per-tool install, version check, and readiness preflight references
+
 ## Boundary rules
 
 - Do not invent missing benchmark intent; route to Architect.

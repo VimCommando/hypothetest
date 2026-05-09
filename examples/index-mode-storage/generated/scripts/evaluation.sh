@@ -628,9 +628,9 @@ EOF
         echo "  normalized: []"
         echo "  primary:"
         echo "    - indexing_throughput_docs_per_sec"
-        echo "    - store_size_bytes"
+        echo "    - store_size_after_force_merge"
         echo "  secondary:"
-        echo "    - force_merge_duration_millis"
+        echo "    - force_merge_duration_sec"
 
         echo "comparisons:"
         echo "  artifacts: []"

@@ -85,7 +85,7 @@ secondary_metrics:
     description: >
       Wall-clock time for the force-merge operation to complete.
       Extracted from the _forcemerge API response `took` field (milliseconds).
-    unit: milliseconds
+    unit: seconds
     source: phase_artifact
     artifact: force_merge_result.json
     extraction_path: took

@@ -26,20 +26,24 @@ sudo dnf install -y podman podman-compose
 ## Version check
 ```bash
 podman --version
-podman-compose --version
+podman compose version 2>/dev/null || podman-compose --version
 ```
 
 ## Readiness preflight
 
-Verify Podman can run containers and compose is functional:
+Podman supports two compose variants:
+- `podman compose` — built-in subcommand (Podman 4.x+)
+- `podman-compose` — standalone Python wrapper
+
+Verify Podman can run containers and at least one compose variant is functional:
 ```bash
 podman info >/dev/null 2>&1
-podman-compose --version >/dev/null 2>&1
+podman compose version >/dev/null 2>&1 || podman-compose --version >/dev/null 2>&1
 ```
 
 For remote scope, verify compose on the remote host:
 ```bash
-ssh <ssh_config_host> podman-compose --version
+ssh <ssh_config_host> "podman compose version 2>/dev/null || podman-compose --version"
 ```
 
 ## URL

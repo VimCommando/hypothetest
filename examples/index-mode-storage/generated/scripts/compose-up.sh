@@ -7,12 +7,13 @@ set -euo pipefail
 SSH_HOST="ironhide.local"
 REMOTE_WORKDIR="/tmp/hypothetest/evaluations"
 COMPOSE_DIR="generated/compose"
+COMPOSE_ENGINE="${HYPOTHETEST_COMPOSE_ENGINE:-podman-compose}"
 HEALTH_TIMEOUT=120
 HEALTH_INTERVAL=5
 
 ES_URL="http://ironhide.local:9200"
 
-echo "[start] engine=podman host=${SSH_HOST} workdir=${REMOTE_WORKDIR}"
+echo "[start] engine=${COMPOSE_ENGINE} host=${SSH_HOST} workdir=${REMOTE_WORKDIR}"
 
 if [[ "${HYPOTHETEST_DRY_RUN:-false}" == "true" ]]; then
   echo "[healthy] dry_run=true"
@@ -27,7 +28,7 @@ scp -q \
   "${COMPOSE_DIR}/elasticsearch.yml" \
   "${SSH_HOST}:${REMOTE_WORKDIR}/${COMPOSE_DIR}/"
 
-ssh "${SSH_HOST}" "cd ${REMOTE_WORKDIR} && podman-compose -f ${COMPOSE_DIR}/compose.yml up -d"
+ssh "${SSH_HOST}" "cd ${REMOTE_WORKDIR} && ${COMPOSE_ENGINE} -f ${COMPOSE_DIR}/compose.yml up -d"
 
 elapsed=0
 while (( elapsed < HEALTH_TIMEOUT )); do

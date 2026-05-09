@@ -14,7 +14,6 @@ prerequisites:
 include:
   directories:
     - templates/
-    - diagnostics/
     - generated/
 datasets:
   - name: yelp-reviews

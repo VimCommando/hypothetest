@@ -30,7 +30,7 @@ test -f /tmp/esdiag-preflight/out/nodes_stats.json
 ```
 
 `esdiag collect` requires a named host, not a raw URL. See
-`references/esdiag-operations.md` in the Operator skill for full syntax.
+[`../../hypothetest-operator/references/esdiag-operations.md`](../../hypothetest-operator/references/esdiag-operations.md) for full syntax.
 
 When an encrypted keystore is configured, verify the keystore password
 source is available:
