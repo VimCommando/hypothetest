@@ -87,8 +87,9 @@ Prefer `compose` unless the user explicitly asks for another target.
 
 When `elasticsearch.version` is `latest` or omitted, resolve to the
 current stable Elasticsearch release and surface it to the user before
-proceeding. The user may need a specific version for compatibility
-testing, regression work, or to match a production deployment.
+proceeding. As of 2025-05, the current stable release is **9.4.0**.
+The user may need a specific version for compatibility testing,
+regression work, or to match a production deployment.
 
 ## Compose defaults
 
@@ -276,6 +277,8 @@ These rules apply to every compiled evaluation.sh, regardless of scenario:
 - **Include `--max-time` on curl calls.** All `es_api` helper functions and inline curl calls should include `--max-time` with a reasonable default (30s for API calls, 10s for existence checks). The value is scenario-dependent and may be overridden, but the default prevents unresponsive endpoints from hanging the evaluation indefinitely.
 - **Redirect background subshells spawned inside `$()`.** When a function backgrounds a subshell (`( while ... ) &`) and the function is called inside a command substitution (`pid=$(start_poller)`), the background process inherits the pipe's write end. If its stdout is not redirected, the `$()` blocks until the background process exits. Redirect to a log file (`>"${logfile}" 2>&1 &`) when the output is valuable, or to `/dev/null` for fire-and-forget processes.
 - **Use data-driven comparison and report generation.** `task_compare_results` and `task_write_report` must aggregate all numeric fields present in the measurement YAMLs dynamically, not reference a hardcoded field list. When measurement fields are added or renamed, the comparison and report should pick them up without code changes. Use explicit `is None` checks for missing values — never Python's `or` operator, which treats `0.0` as falsy.
+- **Honor `--keep-going` for serial tasks.** When `--keep-going` is set, `run_task` records failures in `failed_tasks` and continues to the next task instead of aborting. At the end of `command_run`, report all failed tasks. Without `--keep-going`, the first serial task failure still aborts the evaluation.
+- **Compile a validation task after dataset generation.** When the evaluation plan includes a decompression or generation step followed by a load step, compile a `validate_dataset` task between them. The validation must check that every line in the generated NDJSON file is exactly one JSON object. Concatenated-object lines are a known artifact of bz2 decompression when multiple compressed files are concatenated before extraction.
 
 ## Isolation requirement
 
@@ -452,9 +455,9 @@ Return concrete files or patches when possible. Avoid abstract brainstorming onc
 When the blueprint is complete and validated, tell the user:
 
 1. **Hand off to the Coordinator** to bind the blueprint to their
-   environment: `"The blueprint is ready. Next, use the Coordinator
-   skill to run readiness checks and generate deployment scripts for
-   your environment."`
+   environment: `"The blueprint is ready. Next, run the Coordinator
+   skill to verify your environment and generate deployment scripts:"`
+   `/hypothetest:coordinator`
 2. Summarize what the Coordinator will need to verify: deployment
    target, tool availability, dataset access, and any privileged
    commands declared in evaluation.sh.

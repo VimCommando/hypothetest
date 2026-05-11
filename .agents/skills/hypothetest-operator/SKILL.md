@@ -209,6 +209,15 @@ inputs on the machine that runs the loader. The remote SSH host only needs the
 compose deployment assets and runtime support files unless a remote-local data
 source is explicitly declared.
 
+When the Operator generates or decompresses a dataset (e.g., extracting
+bz2-compressed NDJSON files for a Rally track), validate the output before
+loading. Concatenating multiple bz2 files before extraction can produce
+lines where two JSON objects are joined without a newline separator. Run
+an NDJSON line-integrity check after any decompression or generation step:
+verify that every line parses as exactly one JSON object. If validation
+fails, repair the corrupt lines or fail with a clear error identifying
+the bad line number and cause before the loader consumes the data.
+
 ### Rally
 
 Use Rally for track/challenge-based data or workloads.

@@ -431,12 +431,12 @@ assets have a problem that should be fixed before the Operator runs.
 
 When readiness is confirmed and handoff verification passes, tell the user:
 
-1. **Run the evaluation** with the Operator skill:
-   `"Readiness confirmed. Run the evaluation with the Operator skill:
-   ./generated/scripts/evaluation.sh run"`
-2. Mention key options: `--dry-run` to verify without executing,
-   `--quiet` for milestone-only output, `--env .env` if a generated
-   env file was created.
+1. **Hand off to the Operator** to execute the evaluation:
+   `"Readiness confirmed. Run the evaluation with the Operator skill:"`
+   `/hypothetest:operator`
+2. Mention key options the Operator supports: `--dry-run` to verify
+   without executing, `--quiet` for milestone-only output, `--env .env`
+   if a generated env file was created.
 3. If any readiness items were `ready_with_warnings`, remind the user
    which metrics or features will be unavailable.
 

@@ -94,7 +94,7 @@ function print_help_main() {
 
 # ----- Environment Configuration -----
 
-declare template_version="0.2.0"
+declare template_version="0.3.0"
 declare script_dir
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 declare blueprint_root
@@ -147,9 +147,13 @@ function print_env() {
 # ----- Process Control -----
 
 declare current_task=""
+declare -a failed_tasks=()
 
 function on_error() {
     local status=$?
+    if [[ -n ${current_task} && ${keep_going} == "true" ]]; then
+        return 0
+    fi
     if [[ -n ${current_task} ]]; then
         log_error "Task $(magenta "${current_task}") failed with exit status ${status}"
     else
@@ -196,10 +200,17 @@ function run_task() {
     log_milestone "$(green start) task $(cyan "${task}")"
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
         log_milestone "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
+    elif "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1; then
+        log_milestone "$(green complete) task $(cyan "${task}")"
+    elif [[ ${keep_going} == "true" ]]; then
+        log_error "Task $(magenta "${task}") failed (see ${HYPOTHETEST_LOG_DIR}/${task}.log)"
+        log_warn "Continuing because $(gray --keep-going) is set"
+        failed_tasks+=("${task}")
     else
-        "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1
+        log_error "Task $(magenta "${task}") failed (see ${HYPOTHETEST_LOG_DIR}/${task}.log)"
+        current_task=""
+        return 1
     fi
-    log_milestone "$(green complete) task $(cyan "${task}")"
     current_task=""
 }
 
@@ -284,7 +295,13 @@ function command_run() {
 
     run_task compare_results
     run_task write_report
-    log_milestone "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
+
+    if [[ ${#failed_tasks[@]} -gt 0 ]]; then
+        log_warn "Evaluation finished with $(magenta "${#failed_tasks[@]}") failed task(s): $(yellow "${failed_tasks[*]}")"
+        log_milestone "$(yellow partial) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
+    else
+        log_milestone "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
+    fi
 }
 
 function command_report() {
