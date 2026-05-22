@@ -140,8 +140,8 @@ convention (`compose_up` / `compose_down`). The runner passes the baseline
 variation to `eck-up.sh` via `HYPOTHETEST_VARIATION` and tracks
 `CURRENT_VARIATION` so `apply_variation` skips the redundant first apply.
 
-When the provider is k3s, `k3s-install.sh` and `k3s-uninstall.sh` handle
-the cluster lifecycle independently of ECK. Expected layout:
+When the provider is k3s or k3d, provider-specific install/uninstall scripts
+handle the cluster lifecycle independently of ECK. Expected layout:
 
 ```text
 generated/eck/namespace.yaml
@@ -151,6 +151,8 @@ generated/scripts/eck-up.sh
 generated/scripts/eck-down.sh
 generated/scripts/k3s-install.sh   (only when provider: k3s)
 generated/scripts/k3s-uninstall.sh (only when provider: k3s)
+generated/scripts/k3d-install.sh   (only when provider: k3d)
+generated/scripts/k3d-uninstall.sh (only when provider: k3d)
 ```
 
 The Operator does not generate or modify these assets.
@@ -206,6 +208,15 @@ otherwise. For remote compose, keep included datasets, Rally tracks, and espipe
 inputs on the machine that runs the loader. The remote SSH host only needs the
 compose deployment assets and runtime support files unless a remote-local data
 source is explicitly declared.
+
+When the Operator generates or decompresses a dataset (e.g., extracting
+bz2-compressed NDJSON files for a Rally track), validate the output before
+loading. Concatenating multiple bz2 files before extraction can produce
+lines where two JSON objects are joined without a newline separator. Run
+an NDJSON line-integrity check after any decompression or generation step:
+verify that every line parses as exactly one JSON object. If validation
+fails, repair the corrupt lines or fail with a clear error identifying
+the bad line number and cause before the loader consumes the data.
 
 ### Rally
 
@@ -263,23 +274,51 @@ Collect raw metrics before summarizing. Use `esdiag` as the default Elasticsearc
 
 Before any phase that can destroy or reset the only recoverable copy of state, run a diagnostics preflight for every configured collection path. For `esdiag`, verify the same runtime environment that will execute collection has the required endpoint credentials, source files, keystore access, and `ESDIAG_KEYSTORE_PASSWORD` when an encrypted keystore is used. If diagnostics provide primary metrics or required evidence, a failed preflight is a hard stop before destructive reset or teardown.
 
-For each configured collection point, execute `esdiag collect` with the scenario's YAML-defined API list or source definition. Use `--sources <path/to/sources.yml>` when the collection endpoints must follow a generated source file. Preserve the raw `esdiag` diagnostic bundle as its `.zip` artifact; do not convert raw API outputs to TOON.
+For each configured collection point, execute `esdiag collect` against the
+registered named host. Use `--sources <path/to/sources.yml>` when the
+collection endpoints must follow a generated source file. Preserve the raw
+`esdiag` diagnostic bundle as its `.zip` artifact; do not convert raw API
+outputs to TOON. See `references/esdiag-operations.md` for `esdiag` syntax,
+named-host requirements, and output format details.
 
-Default Elasticsearch API collection around each phase:
+Default Elasticsearch APIs to verify in collection output:
 
-- `_cluster/health`
-- `_nodes/stats`
-- `_stats`
-- `_cat/segments?format=json`
-- `_cat/indices?format=json`
+- `cluster_health`
+- `nodes_stats`
+- `indices_stats`
+- `cat_segments`
+- `cat_indices`
+
+These are the APIs the measurement plan typically requires, expressed as
+esdiag bundle filenames (not raw ES paths). After unzipping the collection
+bundle, verify these files exist. The default `esdiag collect` type covers
+most of them; use `--include` only after confirming an API is missing from
+the default collection and verifying the correct esdiag identifier via
+`esdiag collect --help`.
 
 For force-merge phases, collect segment and store stats before and after.
 
 For snapshot/frozen-like phases, collect repository/snapshot information when available.
 
-If a scenario provides `measure.diagnostics.at`, honor those API lists exactly for that collection point. Do not add broader diagnostics unless the plan explicitly requests them.
+If a scenario provides `measure.diagnostics.at`, ensure the collection
+covers every API in that list. The list declares what the measurement plan
+requires in the output — verify coverage after collection rather than
+blindly passing entries to `--include`, since esdiag identifiers may differ
+from raw ES API paths. Do not add broader diagnostics unless the plan
+explicitly requests them.
 
 If the scenario configures a diagnostics results target, execute `esdiag process` to ship the bundle to that results cluster and record the destination in the evaluation manifest.
+
+When a collection step produces deeply nested raw output (e.g., full
+`nodes_stats` responses), the teardown or post-collection task should emit a
+flat summary with key deltas relevant to the measurement plan. Summarize
+fields that changed between before/after snapshots rather than preserving
+the full nested structure. Do not hardcode field names — derive them from
+the measurement plan's metric declarations.
+
+When running in dry-run mode, start and immediately stop any background
+pollers or sampling processes to verify they initialize and terminate
+cleanly without blocking.
 
 Store Hypothetest's own derived metric rows as TOON (`.toon`), not JSON or CSV. Normalize metric records where possible to TOON rows shaped like:
 
@@ -412,6 +451,22 @@ Partial evaluations are valid Analyst inputs as long as `evaluation.yml` records
 - Write the exact commands used.
 - Prefer idempotent scripts.
 
+## Next steps
+
+When the evaluation completes (or partially completes), tell the user:
+
+1. **Hand off to the Analyst** to interpret results:
+   `"Evaluation complete. Use the Analyst skill to normalize
+   measurements, run comparisons, and generate the report."`
+2. Point to the evaluation directory:
+   `"Artifacts are at <HYPOTHETEST_EVALUATION_DIR>. The Analyst
+   will read evaluation.yml as its starting point."`
+3. If the evaluation failed or was partial, note which variations
+   completed and which evidence is available for analysis.
+4. To regenerate comparison and report from existing data:
+   `./generated/scripts/evaluation.sh report --run-id <ID>`
+
 ## References
 
 - `references/artifacts.md`
+- `references/esdiag-operations.md` — load when blueprint uses `measure.diagnostics.tool: esdiag`

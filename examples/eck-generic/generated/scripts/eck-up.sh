@@ -22,7 +22,7 @@ fi
 
 # --- ECK operator ---
 if [[ "${INSTALL_OPERATOR}" == "true" ]]; then
-  if ! kubectl get deployment elastic-operator -n elastic-system >/dev/null 2>&1; then
+  if ! kubectl get statefulset elastic-operator -n elastic-system >/dev/null 2>&1; then
     echo "[start] phase=operator_install"
     helm repo add elastic https://helm.elastic.co 2>/dev/null || true
     helm repo update elastic
@@ -30,15 +30,13 @@ if [[ "${INSTALL_OPERATOR}" == "true" ]]; then
       --namespace elastic-system \
       --create-namespace \
       --version "${ECK_OPERATOR_VERSION}"
-    kubectl wait --for=condition=Available \
-      deployment/elastic-operator -n elastic-system \
-      --timeout=120s
+    kubectl rollout status statefulset/elastic-operator -n elastic-system --timeout=120s
     echo "[ready] phase=operator_install"
   else
     echo "[ready] phase=operator_exists"
   fi
 else
-  if ! kubectl get deployment elastic-operator -n elastic-system -o jsonpath='{.status.availableReplicas}' 2>/dev/null | grep -q '[1-9]'; then
+  if ! kubectl get statefulset elastic-operator -n elastic-system -o jsonpath='{.status.readyReplicas}' 2>/dev/null | grep -q '[1-9]'; then
     echo "[failed] reason=operator_not_running"
     exit 1
   fi

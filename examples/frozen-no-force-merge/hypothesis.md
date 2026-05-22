@@ -126,10 +126,10 @@ measure:
     tool: esdiag
     at:
       after_phase:
-        apis:
-          - _nodes/stats
-          - _stats
-          - _cat/segments?format=json
+        required_apis:
+          - nodes_stats
+          - indices_stats
+          - cat_segments
 compare:
   baseline: force_merged
   candidates:

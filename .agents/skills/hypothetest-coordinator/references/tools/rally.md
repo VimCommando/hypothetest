@@ -30,9 +30,14 @@ esrally --version
 
 ## Readiness preflight
 
-Verify Rally can resolve its configuration and reach the cluster:
+Verify Rally installation and configuration:
 ```bash
-esrally list tracks --target-hosts="${ELASTICSEARCH_URL}" 2>/dev/null
+esrally list tracks 2>/dev/null
+```
+
+Verify cluster connectivity separately:
+```bash
+curl -sf "${ELASTICSEARCH_URL}/_cluster/health" >/dev/null
 ```
 
 ## URL

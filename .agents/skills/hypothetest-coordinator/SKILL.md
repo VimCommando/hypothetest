@@ -154,7 +154,16 @@ For `esdiag`, verify the full diagnostics credential path before execution:
 - results-cluster endpoint and auth material are present when `measure.diagnostics.results` is configured.
 - the expected `esdiag collect` or `esdiag process` preflight can run non-destructively from the same environment that will execute the evaluation.
 
-If diagnostics provide primary or required secondary metrics, missing esdiag credentials are blockers, not warnings. If diagnostics are optional, missing esdiag access may be `ready_with_warnings`, but the readiness output must say which metrics will be unavailable.
+When the cluster is reachable, run an esdiag smoke test before handoff:
+
+1. Register the cluster as a named host: `esdiag host add <name> elasticsearch <url>`.
+2. Run `esdiag collect <name> <tmpdir>` to verify collection works end-to-end.
+3. Unzip the output bundle and verify at least one expected file exists (e.g., `nodes_stats.json`).
+4. Record the registered esdiag host name in readiness.toon and in the generated `.env`.
+
+When diagnostics provide primary or required secondary metrics, a failed smoke test is a blocker. When diagnostics are optional, a failed smoke test is `ready_with_warnings` — the readiness output must say which metrics will be unavailable.
+
+For privileged commands used by the evaluation (e.g., `sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'`), verify `sudo -n` works for each one. The Architect should declare privileged commands in evaluation.sh (e.g., in a comment header). The Coordinator verifies the declared list rather than extracting commands from bash source. When any `sudo -n` check fails, load `references/privilege-setup.md` and present the remediation options to the user.
 
 ## Scenario-specific checks
 
@@ -167,7 +176,8 @@ For `compose`:
 - If `deployment.scope` is `remote`, verify `deployment.remote.workdir` exists or can be created, and that the remote user can write to it.
 - If `deployment.scope` is `remote`, do not require raw dataset files to exist on the SSH host. Verify dataset access where the declared loader will run. The SSH host normally receives compose assets and runtime support files only; raw data reaches Elasticsearch through `espipe`, Rally/esrally, or another declared indexing phase.
 - If the scenario explicitly declares remote data generation, remote downloads, or a remote-local script phase, verify only those remote data prerequisites.
-- Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host.
+- Confirm the scenario's memory and disk expectations are realistic for the selected local or remote host. When available host memory significantly exceeds the compose defaults (`ES_HEAP=2g`, `ES_MEMORY=4g`), note available resources in readiness.toon and recommend scaled values. Do not auto-apply — present the recommendation and let the user confirm.
+- When the measurement plan does not include query metrics, recommend index-only Rally challenges if available for the declared track. Note the runtime difference compared to full challenges that include query suites.
 - Confirm snapshot/searchable snapshot scenarios use a filesystem repository, not S3-compatible services, unless the scenario explicitly targets a non-local deployment.
 - Confirm generated volume and repository paths are repo-local or clearly declared.
 
@@ -176,12 +186,13 @@ For `kubernetes`:
 Kubernetes provider detection and confirmation:
 
 - Run `kubectl cluster-info` to detect an existing cluster.
-- If `deployment.kubernetes.provider` is declared, validate it. If `existing` and no cluster found, mark readiness `blocked`. If `k3s` and cluster already found, skip k3s install.
+- If `deployment.kubernetes.provider` is declared, validate it. If `existing` and no cluster found, mark readiness `blocked`. If `k3s` and cluster already found, skip k3s install. If `k3d` and Docker not running, mark readiness `blocked`.
 - If `deployment.kubernetes.provider` is omitted, ask the user:
-  - **Cluster found:** "I found Kubernetes cluster `<context-name>` at `<endpoint>`. I'll create a `hypothetest` namespace and deploy ECK there. Is this the right cluster? If you'd rather use an isolated throwaway, I can install k3s instead."
-  - **No cluster found:** "No Kubernetes cluster detected. I can install k3s — a lightweight single-node Kubernetes that runs as a system service. Clean removal with `k3s-uninstall.sh` when you're done. Proceed?"
-- When provider is explicitly declared, skip the question but still echo what you're targeting before acting ("Using existing cluster `<context>` at `<endpoint>`" or "Installing k3s as declared").
-- Record the resolved provider in readiness.toon as `kubernetes_provider: existing` or `kubernetes_provider: k3s`.
+  - **Cluster found:** "I found Kubernetes cluster `<context-name>` at `<endpoint>`. I'll create a `hypothetest` namespace and deploy ECK there. Is this the right cluster? If you'd rather use an isolated throwaway, I can install k3s (Linux) or k3d (macOS/Linux, runs in Docker) instead."
+  - **No cluster found (macOS):** "No Kubernetes cluster detected. I can create a k3d cluster — k3s running inside Docker containers. Clean removal with `k3d-uninstall.sh` when you're done. Proceed?"
+  - **No cluster found (Linux):** "No Kubernetes cluster detected. I can install k3s — a lightweight single-node Kubernetes that runs as a system service. Clean removal with `k3s-uninstall.sh` when you're done. Or use k3d if you prefer Docker-based isolation. Proceed?"
+- When provider is explicitly declared, skip the question but still echo what you're targeting before acting ("Using existing cluster `<context>` at `<endpoint>`", "Installing k3s as declared", or "Creating k3d cluster as declared").
+- Record the resolved provider in readiness.toon as `kubernetes_provider: existing`, `kubernetes_provider: k3s`, or `kubernetes_provider: k3d`.
 
 Kubernetes readiness checks (after provider is resolved):
 
@@ -319,15 +330,27 @@ selects and fills patterns from the reference catalog.
 | `generated/scripts/compose-down.sh` | Stop cluster (compose target) | compose templates |
 | `generated/scripts/k3s-install.sh` | Install k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
 | `generated/scripts/k3s-uninstall.sh` | Remove k3s (kubernetes target, provider: k3s) | `references/tools/k3s.md` |
+| `generated/scripts/k3d-install.sh` | Create k3d cluster (kubernetes target, provider: k3d) | `references/tools/k3d.md` |
+| `generated/scripts/k3d-uninstall.sh` | Delete k3d cluster (kubernetes target, provider: k3d) | `references/tools/k3d.md` |
 | `generated/scripts/eck-up.sh` | Start cluster (kubernetes target) | `references/eck-templates.md` |
 | `generated/scripts/eck-down.sh` | Stop cluster (kubernetes target) | `references/eck-templates.md` |
 | `generated/scripts/sample.sh` | During-phase observation | `references/script-templates.md` |
 | `generated/scripts/reset.sh` | Variation reset (delete indices, clear caches) | calling convention contract |
 | `generated/scripts/load.sh` | Dataset loading wrapper | calling convention contract |
 
+`load.sh` is the environment-specific loader wrapper. The Architect's
+compiled `evaluation.sh` must delegate all dataset loading to `load.sh`
+rather than inlining loader calls. If the Coordinator finds direct
+`esrally` or `espipe` calls in the Architect's `evaluation.sh`, note
+the issue in readiness and patch the calls to delegate to `load.sh`.
+
 Also generate `generated/compose/` (compose.yml, .env, elasticsearch.yml)
 or `generated/eck/` (namespace.yaml, elasticsearch.yaml, optionally
 kibana.yaml) for the declared deployment target.
+
+Generated `hypothetest.yml` should include a `$schema` key pointing to
+the Coordinator's schema so that `ys hypothetest.yml` works without an
+explicit `-f` flag.
 
 ### Script calling convention
 
@@ -375,12 +398,17 @@ only the files relevant to the current blueprint.
 - `references/tools/kubectl.md` — when `deployment.target: kubernetes`
 - `references/tools/helm.md` — when `deployment.target: kubernetes`
 - `references/tools/k3s.md` — when `deployment.kubernetes.provider` resolves to `k3s`
+- `references/tools/k3d.md` — when `deployment.kubernetes.provider` resolves to `k3d`
 - `references/tools/jq.md` — when `diagnostics.during` is declared
+- `references/tools/ssh.md` — when `deployment.scope: remote`
 
 **Loaded by prescribed method or profile:**
 - `references/tools/perf.md` — when `on_cpu` method is prescribed
 - `references/tools/bpftrace.md` — when `off_cpu` method is prescribed
 - `references/tools/sysstat.md` — when `standard` or `comprehensive` profile on Linux
+
+**Loaded by readiness result:**
+- `references/privilege-setup.md` — when any `sudo -n` check fails for declared privileged commands
 
 #### Generation references
 
@@ -390,6 +418,36 @@ only the files relevant to the current blueprint.
 - **diagnostics.during declared:** `references/observation-methods.md`
 
 Never load both compose and ECK reference sets simultaneously.
+
+## Handoff verification
+
+Before declaring the handoff complete, run `evaluation.sh plan` and
+`evaluation.sh env` as a dry-run integration check. This verifies the
+generated script parses correctly and resolves environment variables
+without executing any tasks. If either command fails, the generated
+assets have a problem that should be fixed before the Operator runs.
+
+## Next steps
+
+When readiness is confirmed and handoff verification passes, tell the user:
+
+1. **Hand off to the Operator** to execute the evaluation:
+   `"Readiness confirmed. Run the evaluation with the Operator skill:"`
+   `/hypothetest:operator`
+2. Mention key options the Operator supports: `--dry-run` to verify
+   without executing, `--quiet` for milestone-only output, `--env .env`
+   if a generated env file was created.
+3. If any readiness items were `ready_with_warnings`, remind the user
+   which metrics or features will be unavailable.
+
+## References
+
+- `references/compose-templates.md` — compose deployment patterns and lifecycle scripts
+- `references/eck-templates.md` — ECK CRD patterns, kustomize overlays, and lifecycle scripts
+- `references/script-templates.md` — evaluation, load, reset, and sample script conventions
+- `references/observation-methods.md` — full method catalog for during-phase observation *(source of truth)*
+- `references/privilege-setup.md` — privilege escalation and sysctl configuration
+- `references/tools/` — per-tool install, version check, and readiness preflight references
 
 ## Boundary rules
 

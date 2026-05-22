@@ -85,7 +85,7 @@ secondary_metrics:
     description: >
       Wall-clock time for the force-merge operation to complete.
       Extracted from the _forcemerge API response `took` field (milliseconds).
-    unit: milliseconds
+    unit: seconds
     source: phase_artifact
     artifact: force_merge_result.json
     extraction_path: took
@@ -99,21 +99,21 @@ diagnostic_collections:
 
   before_load:
     trigger: before load_data phase
-    apis:
-      - _cluster/health
-      - _nodes/stats
-      - _cat/nodes?v&format=json
+    required_apis:
+      - cluster_health
+      - nodes_stats
+      - cat_nodes
     purpose: >
       Baseline cluster state before any indexing. Captures node resource
       state and confirms cluster is green before each variation evaluation.
 
   after_load:
     trigger: after load_data phase, before force_merge phase
-    apis:
-      - _nodes/stats
-      - _stats
-      - _cat/segments?format=json
-      - _cat/indices?v&format=json
+    required_apis:
+      - nodes_stats
+      - indices_stats
+      - cat_segments
+      - cat_indices
     purpose: >
       Post-load cluster state. Captures indexing stats, segment counts,
       and store sizes before force-merge. Used to derive store_size_after_load
@@ -121,11 +121,11 @@ diagnostic_collections:
 
   after_force_merge:
     trigger: after collect_store_after_force_merge phase
-    apis:
-      - _nodes/stats
-      - _stats
-      - _cat/segments?format=json
-      - _cat/indices?v&format=json
+    required_apis:
+      - nodes_stats
+      - indices_stats
+      - cat_segments
+      - cat_indices
     purpose: >
       Post-force-merge cluster state. Primary source for store_size_after_force_merge
       cross-check. Captures final segment layout and store sizes.

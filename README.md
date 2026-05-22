@@ -28,6 +28,7 @@ The compiled plan schema is intentionally flat:
 name
 question
 hypothesis
+experiment
 deployment
 dataset
 variations
@@ -126,5 +127,6 @@ cp -R .agents /path/to/repo/
 Skills:
 
 - `$hypothetest-architect` — consults on or compiles benchmark hypotheses into a canonical plan.
+- `$hypothetest-coordinator` — validates environments and generates environment-specific scripts for blueprint execution.
 - `$hypothetest-operator` — implements and evaluates the plan, initially targeting compose with Docker or Podman.
 - `$hypothetest-analyst` — interprets evaluation artifacts and writes comparison reports.

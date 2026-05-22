@@ -65,6 +65,13 @@ A complete hypothesis needs:
 
 Use `experiment.constants.required` for controls that must match exactly or make the blueprint invalid. Use `experiment.constants.best_effort` for controls the user wants held as closely as the target allows; these must be recorded and reported when a deployment cannot expose an exact equivalent. Use `experiment.variables` only for factors intentionally changed by the experiment. Do not put the same factor in constants and variables.
 
+Entries in `experiment.constants.required` and `experiment.constants.best_effort` are factor labels — plain strings like `elasticsearch_version` or `dataset`. They are not key-value pairs. The factor's value is declared in the relevant plan section (`deployment`, `dataset`, `variation.config`). Do not generate `{key: value}` map entries in the constants arrays.
+
+In consult mode, also ask:
+
+- When the independent variable affects per-request behavior, confirm the calibration strategy for related parameters. Changing one parameter (e.g., bulk_size) may require adjusting others (e.g., max_concurrent_requests) to hold overall pressure constant. Surface this tradeoff rather than assuming a default.
+- "Do you want to capture wall-clock elapsed time per variation?" Wall-clock time is not in Rally CSV output and must be instrumented separately (e.g., `date` around the `load.sh` call). It is almost always useful for sweep experiments comparing run duration.
+
 If any required intent is missing in compile mode, fail with a short error list and the exact section that needs to be fixed. Do not invent missing scientific intent.
 
 ## Deployment targets
@@ -80,8 +87,9 @@ Prefer `compose` unless the user explicitly asks for another target.
 
 When `elasticsearch.version` is `latest` or omitted, resolve to the
 current stable Elasticsearch release and surface it to the user before
-proceeding. The user may need a specific version for compatibility
-testing, regression work, or to match a production deployment.
+proceeding. As of 2025-05, the current stable release is **9.4.0**.
+The user may need a specific version for compatibility testing,
+regression work, or to match a production deployment.
 
 ## Compose defaults
 
@@ -186,6 +194,12 @@ dataset:
 
 Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
 
+For throughput and merge experiments that do not measure query performance, prefer index-only Rally challenges when available. Full challenges often include query suites that add significant runtime without contributing to the measurement plan.
+
+When `bulk_size` is a parameter or varies across variations, verify warmup safety: compute `total_requests = ceil(dataset_docs / bulk_size)` and check that total requests comfortably exceeds the challenge's warmup period. A `bulk_size` that results in fewer total requests than the warmup window causes Rally to consume the entire dataset during warmup and record no throughput metric.
+
+Rally's CSV report format is the safe default — it is supported by both local installs and the `elastic/rally` container image. JSON report format is not universally available. When the Architect generates measurement extraction code, it should expect CSV input unless the blueprint explicitly declares otherwise.
+
 Dataset locality is defined by the loader, not by the deployment SSH target. For remote compose, local input files, Rally tracks, and espipe inputs remain on the machine running the loader unless the dataset explicitly declares that the Operator must generate the data on the remote host. The SSH host does not receive a copy of raw corpus files as part of normal remote deployment setup.
 
 Dataset fixtures in portable blueprints use one object shape:
@@ -249,6 +263,22 @@ The script is the deterministic execution contract. It should:
 - Be written with executable permissions when the output environment supports it; otherwise document `bash generated/scripts/evaluation.sh run` as the execution command.
 
 For multiple repeats, make repeat execution explicit in the generated plan. If the plan randomizes variation order, generate or require a recorded seed and write the resolved order into the evaluation artifacts before execution starts.
+
+### Compilation rules for generated evaluation.sh
+
+These rules apply to every compiled evaluation.sh, regardless of scenario:
+
+- **Delegate dataset loading to `load.sh`.** The compiled evaluation.sh must not inline `esrally`, `espipe`, or other loader calls. All dataset loading calls delegate to `generated/scripts/load.sh`, which the Coordinator generates with the correct environment-specific invocation (container, local binary, remote host). The Architect compiles the phase plan; the Coordinator generates the loader wrapper.
+- **Include a `report` subcommand.** The compiled script must support `evaluation.sh report --run-id <ID>` to regenerate comparison and report artifacts from existing measurements without re-running the evaluation. This is critical when the measurement schema or report format changes after a long evaluation completes.
+- **Support `--quiet` mode.** When `--quiet` is set, suppress info and debug log output to stdout. Emit only milestones (variation/repeat start and pass/fail), warnings, and errors. Verbose output goes to per-task log files only. This makes backgrounded evaluations monitorable via `tail -f`.
+- **Use `run_task` for each variation sub-step.** Each sub-step within a variation (reset, load, collect, measure) should be a separate `run_task` call so each gets its own isolated log file. Do not run the entire variation inline — partial failure diagnosis requires per-step logs.
+- **Use `sudo -n` for all privileged commands.** `sudo -n` (non-interactive) fails immediately when no passwordless grant exists, instead of blocking on stdin. Without `-n`, a missing sudoers entry hangs the evaluation silently with no indication of why.
+- **Never use `curl -X HEAD` against Elasticsearch.** ES returns a response body on HEAD 404 responses, causing curl to hang waiting for a body that never arrives. Use `curl -s -o /dev/null -w "%{http_code}" -X GET` for existence checks.
+- **Include `--max-time` on curl calls.** All `es_api` helper functions and inline curl calls should include `--max-time` with a reasonable default (30s for API calls, 10s for existence checks). The value is scenario-dependent and may be overridden, but the default prevents unresponsive endpoints from hanging the evaluation indefinitely.
+- **Redirect background subshells spawned inside `$()`.** When a function backgrounds a subshell (`( while ... ) &`) and the function is called inside a command substitution (`pid=$(start_poller)`), the background process inherits the pipe's write end. If its stdout is not redirected, the `$()` blocks until the background process exits. Redirect to a log file (`>"${logfile}" 2>&1 &`) when the output is valuable, or to `/dev/null` for fire-and-forget processes.
+- **Use data-driven comparison and report generation.** `task_compare_results` and `task_write_report` must aggregate all numeric fields present in the measurement YAMLs dynamically, not reference a hardcoded field list. When measurement fields are added or renamed, the comparison and report should pick them up without code changes. Use explicit `is None` checks for missing values — never Python's `or` operator, which treats `0.0` as falsy.
+- **Honor `--keep-going` for serial tasks.** When `--keep-going` is set, `run_task` records failures in `failed_tasks` and continues to the next task instead of aborting. At the end of `command_run`, report all failed tasks. Without `--keep-going`, the first serial task failure still aborts the evaluation.
+- **Compile a validation task after dataset generation.** When the evaluation plan includes a decompression or generation step followed by a load step, compile a `validate_dataset` task between them. The validation must check that every line in the generated NDJSON file is exactly one JSON object. Concatenated-object lines are a known artifact of bz2 decompression when multiple compressed files are concatenated before extraction.
 
 ## Isolation requirement
 
@@ -323,7 +353,9 @@ If a metric source is unclear, keep the metric but mark it as unresolved in `gen
 
 ## Diagnostics
 
-Use `esdiag` as the default Elasticsearch diagnostic collector. Scenario diagnostics are YAML configuration, not JSON. Allow each collection point to declare a specific API list under `measure.diagnostics`:
+Use `esdiag` as the default Elasticsearch diagnostic collector. Scenario diagnostics are YAML configuration, not JSON. Allow each collection point to declare a specific API list under `measure.diagnostics`.
+
+The `required_apis` list in `measure.diagnostics.at` declares which API responses the measurement plan requires in the collection output. The Operator verifies coverage after collection and resolves esdiag identifier mapping when using `--include`. The default esdiag collection already includes `nodes_stats`, `indices_stats`, and `cluster_health`; only list APIs that go beyond the default set if the measurement plan requires them:
 
 ```yaml
 measure:
@@ -333,15 +365,15 @@ measure:
       target: optional-results-cluster
     at:
       before_phase:
-        apis:
-          - _cluster/health
-          - _nodes/stats
-          - _stats
+        required_apis:
+          - cluster_health
+          - nodes_stats
+          - indices_stats
       after_phase:
-        apis:
-          - _nodes/stats
-          - _stats
-          - _cat/segments?format=json
+        required_apis:
+          - nodes_stats
+          - indices_stats
+          - cat_segments
 ```
 
 The Architect should include these API lists in `generated/metrics-plan.yml` and ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.
@@ -399,6 +431,7 @@ Before finalizing a blueprint:
 - Primary metrics are declared.
 - Metric sources are plausible.
 - Elasticsearch diagnostic metric sources use `esdiag` collections with explicit API lists.
+- When `bulk_size` is a parameter, `total_requests = ceil(dataset_docs / bulk_size)` comfortably exceeds the warmup period for every variation.
 - Compose hypotheses include engine handling: `auto`, `docker`, or `podman`.
 - Compose hypotheses declare `scope: local` or `scope: remote`.
 - Remote compose hypotheses declare SSH certificate auth and require Coordinator readiness validation.
@@ -416,6 +449,18 @@ When schema-validating generated YAML, use the Rust `yaml-schema` package instal
 ## Architect output tone
 
 Return concrete files or patches when possible. Avoid abstract brainstorming once enough information exists. If information is missing, ask for the smallest number of decisions needed to make progress.
+
+## Next steps
+
+When the blueprint is complete and validated, tell the user:
+
+1. **Hand off to the Coordinator** to bind the blueprint to their
+   environment: `"The blueprint is ready. Next, run the Coordinator
+   skill to verify your environment and generate deployment scripts:"`
+   `/hypothetest:coordinator`
+2. Summarize what the Coordinator will need to verify: deployment
+   target, tool availability, dataset access, and any privileged
+   commands declared in evaluation.sh.
 
 ## References
 
