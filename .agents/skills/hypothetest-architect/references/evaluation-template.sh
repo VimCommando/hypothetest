@@ -160,6 +160,39 @@ function ensure_directories() {
         "${HYPOTHETEST_COMPARISONS_DIR}"
 }
 
+function write_lessons_template() {
+    local lessons_file="${HYPOTHETEST_EVALUATION_DIR}/lessons.md"
+    if [[ -f "${lessons_file}" ]]; then
+        return 0
+    fi
+    cat > "${lessons_file}" <<EOF
+# Evaluation Lessons
+
+Evaluation ID: ${HYPOTHETEST_RUN_ID}
+Started At: ${EVAL_START_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
+
+## Assumptions That Held
+
+- 
+
+## Assumptions That Failed
+
+- 
+
+## Errors And Fixes
+
+- 
+
+## Tool Or Environment Feedback
+
+- 
+
+## Follow-Up Candidates
+
+- 
+EOF
+}
+
 function run_cmd() {
     log_info "$(green running) $(white "$*")"
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
@@ -187,7 +220,7 @@ function run_task() {
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
         log_info "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
     else
-        "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1
+        "${fn}" 2>&1 | tee "${HYPOTHETEST_LOG_DIR}/${task}.log"
     fi
     log_info "$(green complete) task $(cyan "${task}")"
     current_task=""
@@ -252,6 +285,7 @@ PLAN
 
 function command_run() {
     ensure_directories
+    write_lessons_template
     print_env > "${HYPOTHETEST_EVALUATION_DIR}/evaluation.env"
     cp "${HYPOTHETEST_PLAN}" "${HYPOTHETEST_EVALUATION_DIR}/hypothetest.yml"
 

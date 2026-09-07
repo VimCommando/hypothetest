@@ -192,11 +192,21 @@ comparisons[1]{scenario,baseline,candidate,phase,metric,baseline_value,candidate
   example,baseline,candidate,warm_search,search_latency_p99,100,150,50,50,ms,medium
 ```
 
-Create or preserve normalized metric rows when available:
+Create or preserve normalized run measurements in the same wide form as the
+Operator artifact. Keep units in metric column names and invariant provenance
+in metadata:
 
 ```toon
-metrics[1]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
-  example,evaluation-001,compose,baseline,1,warm_search,search_latency_p99,100,ms,rally,ok
+metadata:
+  scenario: example
+  evaluation_id: evaluation-001
+  deployment_target: compose
+  metric_sources:
+    search_latency_p99_ms: rally
+  metric_phases:
+    search_latency_p99_ms: warm_search
+runs[1]{variation,repeat,status,search_latency_p99_ms}:
+  baseline,1,ok,100
 ```
 
 ## Kibana dashboard workflow
@@ -311,8 +321,11 @@ The Analyst is the transform boundary for custom measurement documents:
 
 1. Read local evidence from `evaluation.yml`, `manifest.toon`, `summary.toon`, `comparison.toon`, phase outputs, Rally outputs, espipe outputs, API output, shell output, and Python output.
 2. Extract source-specific facts without changing their meaning.
-3. Normalize extracted values into stable metric and comparison rows using the existing `metrics[...]` and `comparisons[...]` TOON shapes.
-4. Convert each normalized metric row into one compact TOON measurement row conforming to `references/measurement-schema.md`.
+3. Normalize extracted run values into the wide `runs[...]` TOON shape and
+   comparisons into the `comparisons[...]` shape.
+4. Unpivot each wide run only at the dashboard-ingestion boundary, producing
+   one compact measurement row per non-null metric as required by
+   `references/measurement-schema.md`.
 5. Write the rows to `dashboards/data/measurements.toon`.
 6. Ingest that TOON file with espipe's native TOON input support into `metrics-measurement-hypothetest` after the template is ready.
 

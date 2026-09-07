@@ -77,6 +77,7 @@ evaluations/<hypothesis-name>/<timestamp>/
   evaluation.yml           # schema-valid index of all artifacts
   hypothesis.md            # copy of the experiment hypothesis
   hypothetest.yml          # copy of the plan
+  lessons.md               # run-local operator/user feedback for future improvements
   evidence/
     raw/                   # raw API responses, esdiag bundles
     diagnostics/           # before/after diagnostic captures
@@ -87,6 +88,49 @@ evaluations/<hypothesis-name>/<timestamp>/
 The Analyst produces additional artifacts after consuming the runner
 output: normalized measurements, comparisons, charts, summary.toon,
 comparison.toon, and report.md. These are not Operator deliverables.
+
+## Run Lessons
+
+Every evaluation output directory must include a freshly created `lessons.md`.
+Do not copy the repo-level `LESSONS.md` into the run. The run-local file is for
+operator and user feedback that may be reviewed later and incorporated into
+Hypothetest guidance, templates, or tooling.
+
+Create it during workspace preparation, before destructive setup or workload
+execution, so partial and failed evaluations still contain the feedback file.
+Use a concise template:
+
+```markdown
+# Evaluation Lessons
+
+Evaluation ID: <run-id>
+Started At: <utc timestamp>
+
+## Assumptions That Held
+
+- 
+
+## Assumptions That Failed
+
+- 
+
+## Errors And Fixes
+
+- 
+
+## Tool Or Environment Feedback
+
+- 
+
+## Follow-Up Candidates
+
+- 
+```
+
+The Operator may append concrete lessons during execution when a tool,
+environment, or generated script behaves differently than expected. Users may
+also edit this file directly after the run. Keep entries factual: what was
+assumed, what happened, and what behavior should change.
 
 ## Compose engine handling
 
@@ -219,6 +263,22 @@ Capture:
 - metrics store output if configured
 - track, challenge, car, pipeline, target hosts, client options, and track params
 
+Invoke Rally through `ESRALLY_BIN` when provided so background wrappers do not
+depend on an interactive shell `PATH`. For `esrally race`, use
+`--report-format=markdown` and `--report-file`; do not use nonexistent
+`--results-format` or `--results-file` flags. Add
+`--kill-running-processes` to race invocations to clear stale Rally PID
+registrations after interrupted runs.
+
+For ingest-only comparisons, prefer an index-only challenge such as
+`append-no-conflicts-index-only` when available. The full
+`append-no-conflicts` challenge includes query tasks that can dominate runtime
+and heap requirements.
+
+If a track corpus is pre-seeded, do it before any Rally process starts and
+write to Rally's actual `local.dataset.cache` path from `rally.ini`. Never
+copy corpus files into Rally's data directory while Rally is running.
+
 ### espipe
 
 Use espipe for concrete NDJSON/CSV file or stream loading.
@@ -263,7 +323,17 @@ Collect raw metrics before summarizing. Use `esdiag` as the default Elasticsearc
 
 Before any phase that can destroy or reset the only recoverable copy of state, run a diagnostics preflight for every configured collection path. For `esdiag`, verify the same runtime environment that will execute collection has the required endpoint credentials, source files, keystore access, and `ESDIAG_KEYSTORE_PASSWORD` when an encrypted keystore is used. If diagnostics provide primary metrics or required evidence, a failed preflight is a hard stop before destructive reset or teardown.
 
-For each configured collection point, execute `esdiag collect` with the scenario's YAML-defined API list or source definition. Use `--sources <path/to/sources.yml>` when the collection endpoints must follow a generated source file. Preserve the raw `esdiag` diagnostic bundle as its `.zip` artifact; do not convert raw API outputs to TOON.
+For each configured collection point, execute `esdiag collect` with a saved host
+name and output directory:
+
+```bash
+esdiag collect "${ESDIAG_HOST}" "${output_dir}" --type standard
+```
+
+`esdiag collect` does not accept `--host`, `--output`, or `--apis`. The host
+argument is a pre-registered saved host name, not a raw URL. Preserve the raw
+`esdiag` diagnostic bundle as its `.zip` artifact; do not convert raw API
+outputs to TOON.
 
 Default Elasticsearch API collection around each phase:
 
@@ -281,12 +351,27 @@ If a scenario provides `measure.diagnostics.at`, honor those API lists exactly f
 
 If the scenario configures a diagnostics results target, execute `esdiag process` to ship the bundle to that results cluster and record the destination in the evaluation manifest.
 
-Store Hypothetest's own derived metric rows as TOON (`.toon`), not JSON or CSV. Normalize metric records where possible to TOON rows shaped like:
+Store Hypothetest's raw run measurements as TOON (`.toon`), not JSON or CSV.
+Use one row per variation/repeat and one unit-qualified column per metric.
+Evaluation-wide identity and invariant metric provenance belong in metadata;
+do not duplicate scenario, evaluation, deployment, phase, source, or unit in
+every metric value. Use `null` for a missing value and set the run-level status
+to `partial` or `failed`.
 
 ```toon
-metrics[2]{scenario,evaluation_id,deployment_target,variation,repeat,phase,metric,value,unit,source,status}:
-  example,evaluation-001,compose,baseline,1,warm_search,search_latency_p99,120,ms,rally,ok
-  example,evaluation-001,compose,candidate,1,warm_search,search_latency_p99,150,ms,rally,ok
+metadata:
+  scenario: example
+  evaluation_id: evaluation-001
+  deployment_target: compose
+  metric_sources:
+    search_latency_p99_ms: rally
+    ingest_throughput_docs_per_second: espipe
+  metric_phases:
+    search_latency_p99_ms: warm_search
+    ingest_throughput_docs_per_second: load_data
+runs[2]{variation,repeat,status,search_latency_p99_ms,ingest_throughput_docs_per_second}:
+  baseline,1,ok,120,300
+  candidate,1,ok,150,325
 ```
 
 ## During-phase observation
@@ -376,6 +461,8 @@ The runner records:
   is left empty for the Analyst to populate
 - `comparisons` — baseline, candidates; `artifacts` and `decision`
   are left empty for the Analyst to populate
+- `lessons.md` — run-local operator/user feedback artifact, present even for
+  partial evaluations
 
 Record runtime explicitly. `manifest.runtime.total_seconds` is the
 elapsed wall-clock time from evaluation start to completion or failure.

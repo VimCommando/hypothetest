@@ -94,6 +94,7 @@ export HYPOTHETEST_EVALUATION_ROOT="${HYPOTHETEST_EVALUATION_ROOT:-${blueprint_r
 export HYPOTHETEST_RUN_ID="${HYPOTHETEST_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 export HYPOTHETEST_DRY_RUN="${HYPOTHETEST_DRY_RUN:-false}"
 export ELASTICSEARCH_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
+export ESDIAG_HOST="${ESDIAG_HOST:-hypothetest-local}"
 
 declare NAMESPACE="${HYPOTHETEST_K8S_NAMESPACE:-hypothetest}"
 declare CLUSTER_NAME="hypothetest"
@@ -131,6 +132,7 @@ function print_env() {
     echo "HYPOTHETEST_EVALUATION_DIR=${HYPOTHETEST_EVALUATION_DIR}"
     echo "HYPOTHETEST_DRY_RUN=${HYPOTHETEST_DRY_RUN}"
     echo "ELASTICSEARCH_URL=${ELASTICSEARCH_URL}"
+    echo "ESDIAG_HOST=${ESDIAG_HOST}"
     echo "NAMESPACE=${NAMESPACE}"
     echo "LOG_LEVEL=${LOG_LEVEL}"
 }
@@ -262,6 +264,39 @@ function ensure_directories() {
         "${HYPOTHETEST_COMPARISONS_DIR}"
 }
 
+function write_lessons_template() {
+    local lessons_file="${HYPOTHETEST_EVALUATION_DIR}/lessons.md"
+    if [[ -f "${lessons_file}" ]]; then
+        return 0
+    fi
+    cat > "${lessons_file}" <<EOF
+# Evaluation Lessons
+
+Evaluation ID: ${HYPOTHETEST_RUN_ID}
+Started At: ${EVAL_START_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
+
+## Assumptions That Held
+
+- 
+
+## Assumptions That Failed
+
+- 
+
+## Errors And Fixes
+
+- 
+
+## Tool Or Environment Feedback
+
+- 
+
+## Follow-Up Candidates
+
+- 
+EOF
+}
+
 function run_cmd() {
     log_info "$(green running) $(white "$*")"
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
@@ -289,7 +324,7 @@ function run_task() {
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
         log_info "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
     else
-        "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1
+        "${fn}" 2>&1 | tee "${HYPOTHETEST_LOG_DIR}/${task}.log"
     fi
     log_info "$(green complete) task $(cyan "${task}")"
     current_task=""
@@ -434,6 +469,7 @@ function task_validate_prerequisites() {
 
 function task_prepare_workspace() {
     ensure_directories
+    write_lessons_template
     cp "${HYPOTHETEST_PLAN}" "${HYPOTHETEST_EVALUATION_DIR}/hypothetest.yml"
     cp "${blueprint_root}/hypothesis.md" "${HYPOTHETEST_EVALUATION_DIR}/hypothesis.md"
     cp "${blueprint_root}/blueprint.yml" "${HYPOTHETEST_EVALUATION_DIR}/blueprint.yml"
@@ -518,10 +554,11 @@ function do_collect_diagnostics() {
     local output_dir="${HYPOTHETEST_DIAGNOSTICS_DIR}/${variation}/${repeat}"
     mkdir -p "${output_dir}"
 
+    log_info "Diagnostics collection $(cyan "${collection_point}") uses esdiag saved host $(cyan "${ESDIAG_HOST}") and standard profile; requested APIs recorded for context: ${apis}"
     run_cmd esdiag collect \
-        --host "${ELASTICSEARCH_URL}" \
-        --apis "${apis}" \
-        --output "${output_dir}/${collection_point}.zip"
+        "${ESDIAG_HOST}" \
+        "${output_dir}" \
+        --type standard
 }
 
 function do_collect_store_stats() {
@@ -720,6 +757,7 @@ function command_run() {
     cd "${blueprint_root}"
     EVAL_START_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     ensure_directories
+    write_lessons_template
 
     if [[ ! -f "${blueprint_root}/generated/readiness.toon" ]]; then
         log_warn "Coordinator readiness evidence not found (generated/readiness.toon)"

@@ -170,7 +170,7 @@ Support both first-class loaders:
 dataset:
   loader: rally
   track: ./tracks/my-track
-  challenge: append-no-conflicts
+  challenge: append-no-conflicts-index-only
   params:
     bulk_size: 5000
 ```
@@ -310,6 +310,15 @@ report:
 ```
 
 ## Metric plan
+
+Raw measurement artifacts must use a wide TOON layout. Generate one row per
+variation/repeat, with `variation`, `repeat`, and run-level `status` as
+dimensions and every metric as its own column. Metric names must encode their
+units (`_seconds`, `_bytes`, `_count`, `_docs_per_second`, and similar), so do
+not emit a redundant `unit` column. Put invariant scenario/evaluation identity,
+deployment target, metric sources, and metric phases in a top-level metadata
+block. Missing measurements use `null` and make the run status `partial` or
+`failed`; do not create a second row for a missing metric.
 
 For each primary metric, identify at least one plausible source:
 

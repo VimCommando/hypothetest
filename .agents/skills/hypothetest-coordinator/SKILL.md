@@ -149,10 +149,16 @@ For tools launched through wrappers, background processes, SSH, `nohup`, systemd
 For `esdiag`, verify the full diagnostics credential path before execution:
 
 - `esdiag` binary is available.
+- the target endpoint is registered as a saved esdiag host, and the saved host
+  name is exported for the Operator as `ESDIAG_HOST`.
 - source cluster endpoint and auth material are present for collection.
 - `ESDIAG_KEYSTORE_PASSWORD` or the declared keystore password source is available when an encrypted esdiag keystore is used.
 - results-cluster endpoint and auth material are present when `measure.diagnostics.results` is configured.
 - the expected `esdiag collect` or `esdiag process` preflight can run non-destructively from the same environment that will execute the evaluation.
+
+Use the positional `esdiag collect <HOST> <OUTPUT_DIR> --type standard`
+preflight. Do not generate the obsolete `--host`, `--output`, or `--apis`
+form.
 
 If diagnostics provide primary or required secondary metrics, missing esdiag credentials are blockers, not warnings. If diagnostics are optional, missing esdiag access may be `ready_with_warnings`, but the readiness output must say which metrics will be unavailable.
 
