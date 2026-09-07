@@ -114,7 +114,7 @@ datasets:
       tool: rally
       params:
         track: nginx-logs
-        challenge: append-no-conflicts
+        challenge: append-no-conflicts-index-only
         target_size: 200GB
     target: nginx-logs-benchmark
     size: 200GB

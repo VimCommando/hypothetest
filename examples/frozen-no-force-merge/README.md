@@ -10,6 +10,7 @@ This blueprint compares frozen searchable snapshot search cost with and without 
 - esrally
 - espipe
 - esdiag
+- Saved esdiag host registered for the target endpoint (`ESDIAG_HOST`)
 - `data/http_logs.ndjson` relative to this blueprint root
 - `templates/logs.json` relative to this blueprint root
 - `tracks/frozen-search` relative to this blueprint root
@@ -23,3 +24,6 @@ This blueprint compares frozen searchable snapshot search cost with and without 
 ## Evaluation
 
 Use the Hypothetest Operator from this blueprint root so relative paths resolve correctly.
+
+For Rally phases, set `ESRALLY_BIN` to the full `esrally` path when running
+under `nohup`, `caffeinate`, SSH wrappers, or other background shells.

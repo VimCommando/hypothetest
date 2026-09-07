@@ -10,7 +10,19 @@ This repository contains the initial Codex skill set for that workflow:
 
 Configurations are YAML/YML files. Hypothetest's own structured evaluation data is stored as TOON (`.toon`), not JSON or CSV.
 
+Raw measurement TOON uses a wide run table: each variation/repeat is one row
+and each metric is a unit-qualified column. Evaluation-wide identity and
+metric provenance belong in a metadata block instead of being duplicated per
+metric value. Long-form metric/value rows are reserved for explicit analysis
+or ingestion transforms that require them.
+
 Elasticsearch diagnostics are collected through `esdiag`, using YAML-defined API lists for each collection point. `esdiag` keeps raw API outputs in its bundled `.zip` artifact and can also process those diagnostics directly to a results cluster for metric shipping.
+
+The skills encode lessons from real runs: register `esdiag` hosts before
+collection, use positional `esdiag collect <HOST> <OUTPUT_DIR> --type standard`,
+stream task logs with `tee`, use `ESRALLY_BIN` for background Rally runs, and
+use Rally report files plus the metrics store instead of nonexistent
+`--results-*` flags.
 
 The hypothesis testing structure is informed by the seven-step model and statistical-risk concepts summarized in [SixSigma.us, "Hypothesis Testing: A Comprehensive Guide with Examples and Applications"](https://www.6sigma.us/six-sigma-in-focus/hypothesis-testing/).
 
@@ -40,6 +52,21 @@ report
 In `hypothetest.yml`, `measure` and `compare` are plan sections: they declare what to collect and how to decide. In `evaluation.yml`, `measurements` and `comparisons` are result sections: they point to the artifacts produced by executing that plan.
 
 The first execution target is `compose`; `existing` and `elastic-cloud` are planned next targets. Compose hypotheses declare `scope: local` or `scope: remote`; remote compose MVP uses SSH certificate auth from the user's `.ssh/config`, may specify `remote.user`, and requires the Coordinator to verify SSH access plus permission to execute `docker compose` or `podman compose` on the remote host.
+
+For remote compose, SSH is strictly the deployment control plane. Dataset
+loaders and diagnostic clients run on the local Operator host unless a
+scenario explicitly declares another locality. They and local API phases must
+connect directly to the service port published by Docker or Podman. DNS,
+routing, firewall, or client-resolver failures are readiness blockers that
+must be fixed directly; generated SSH tunnels, loopback forwarding, and proxy
+workarounds are prohibited.
+
+Force-merge evaluations require strict serial isolation. Before a load, after
+ingest but before the measured force merge, and after force merge before the
+next variation or repeat, the runner must observe zero active node merges,
+zero active or queued merge-thread-pool work, and zero force-merge tasks across
+multiple consecutive polls. The runner must preserve these observations and
+fail the evaluation on timeout rather than permit overlapping work.
 
 ## Blueprints
 
@@ -80,9 +107,14 @@ Supported fixtures:
 - `scripts/`: allowlisted `.sh` and `.py` phase runners.
 - `diagnostics/`: esdiag `sources.yml` and collection plans.
 
+For public Rally tracks, track corpus data is fetched by `esrally race` into
+Rally's configured `local.dataset.cache`. Coordinator readiness should pre-seed
+large corpora only before Rally starts, using the cache path from `rally.ini`;
+do not copy corpus files into the cache while Rally is running.
+
 Datasets are declared once in `blueprint.yml`. Use `path` when the data is included or expected to already exist; use `generated_by` when the Operator should generate it during execution.
 
-Evaluation outputs may include `evaluations/`, `evaluation.yml`, `manifest.toon`, `summary.toon`, `comparison.toon`, `report.md`, charts, and raw esdiag `.zip` bundles. An evaluation is the complete output of executing a Hypothetest plan: preserved evidence, diagnostics, measurements, comparisons, generated artifacts, and the final report. `evaluation.yml` is the schema-valid index for those artifacts; `manifest.toon` is the compact runtime manifest.
+Evaluation outputs may include `evaluations/`, `evaluation.yml`, `lessons.md`, `manifest.toon`, `summary.toon`, `comparison.toon`, `report.md`, charts, and raw esdiag `.zip` bundles. An evaluation is the complete output of executing a Hypothetest plan: preserved evidence, diagnostics, measurements, comparisons, generated artifacts, run-local lessons, and the final report. The Operator writes `evaluation.yml` as the schema-valid index of execution evidence. The Analyst derives `manifest.toon` from that index and adds normalized measurements, comparisons, and reports.
 
 `blueprint.yml` is the machine-readable manifest for the zip contents and validates against the Architect-owned blueprint schema. It uses the same flat style as `hypothetest.yml`: `name`, `hypothesis`, `plan`, `readme`, `prerequisites`, `include`, `datasets`, and `archive`.
 

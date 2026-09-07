@@ -23,6 +23,8 @@ Accept a candidate if its post-force-merge store size is **>10% smaller** than `
 - Podman on the remote host (`ironhide.local` in `~/.ssh/config`)
 - SSH certificate access to the remote host
 - `espipe` >= 0.3.0 and `esdiag` on PATH
+- A saved esdiag host, for example:
+  `esdiag host add hypothetest-ironhide http://ironhide.local:9200 --app elasticsearch`
 - Yelp review corpus at `datasets/yelp/yelp_academic_dataset_review.json` on the operator machine (the loader runs locally and pushes to the remote endpoint)
 
 ## Evaluation
@@ -36,6 +38,13 @@ hypothetest operator evaluation --blueprint examples/index-mode-storage/
 ```
 
 See `generated/scripts/evaluation.sh` for the full evaluation sequence.
+
+For long macOS runs, launch through `caffeinate` so sleep/App Nap cannot kill
+the runner:
+
+```sh
+nohup caffeinate -i ./generated/scripts/evaluation.sh run > /tmp/hypothetest-eval.log 2>&1 &
+```
 
 ## Files
 

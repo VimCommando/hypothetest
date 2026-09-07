@@ -1,5 +1,6 @@
 # Ramen configuration file
 elastic_ramen.json
+.env
 
 # macOS metadata
 .DS_Store

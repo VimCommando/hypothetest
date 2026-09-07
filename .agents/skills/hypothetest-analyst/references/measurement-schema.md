@@ -25,14 +25,7 @@ data_stream.namespace
 
 ## Transform workflow
 
-The Analyst transforms collected measurements into compact TOON rows:
-
-1. Read local artifacts: `evaluation.yml`, `manifest.toon`, `summary.toon`, `comparison.toon`, phase outputs, Rally outputs, espipe outputs, API output, shell output, and Python output.
-2. Extract source-specific facts without changing source semantics.
-3. Normalize values into the stable Hypothetest metric and comparison TOON rows.
-4. Convert each normalized metric row into one compact measurement row using natural column names.
-5. Write TOON to `dashboards/data/measurements.toon`.
-6. Use espipe's native TOON input support to ingest `dashboards/data/measurements.toon` into `metrics-measurement-hypothetest`.
+Use the [dashboard workflow](dashboards.md#measurement-transform) for extraction and ingestion order. Unpivot the [wide run table](metric-normalization.md) only at this ingestion boundary. Produce one measurement document per non-null metric, with its phase, source, unit, run status, and artifact provenance. Keep missing-value status in the wide source and report; do not invent numeric documents for missing metrics.
 
 Do not use an ECS-compatibility ingest pipeline that renames natural fields into nested ECS-style paths. If a pipeline is needed for an unusual evaluation, keep it limited to evaluation-specific parsing or cleanup.
 

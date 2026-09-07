@@ -160,6 +160,39 @@ function ensure_directories() {
         "${HYPOTHETEST_COMPARISONS_DIR}"
 }
 
+function write_lessons_template() {
+    local lessons_file="${HYPOTHETEST_EVALUATION_DIR}/lessons.md"
+    if [[ -f "${lessons_file}" ]]; then
+        return 0
+    fi
+    cat > "${lessons_file}" <<EOF
+# Evaluation Lessons
+
+Evaluation ID: ${HYPOTHETEST_RUN_ID}
+Started At: ${EVAL_START_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
+
+## Assumptions That Held
+
+-
+
+## Assumptions That Failed
+
+-
+
+## Errors And Fixes
+
+-
+
+## Tool Or Environment Feedback
+
+-
+
+## Follow-Up Candidates
+
+-
+EOF
+}
+
 function run_cmd() {
     log_info "$(green running) $(white "$*")"
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
@@ -187,7 +220,7 @@ function run_task() {
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
         log_info "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
     else
-        "${fn}" > "${HYPOTHETEST_LOG_DIR}/${task}.log" 2>&1
+        "${fn}" > >(tee "${HYPOTHETEST_LOG_DIR}/${task}.log") 2>&1
     fi
     log_info "$(green complete) task $(cyan "${task}")"
     current_task=""
@@ -245,13 +278,15 @@ Generated task plan:
  12. parallel: collect_candidate_before, capture_candidate_environment
  13. run_candidate_workload
  14. collect_candidate_after
- 15. compare_results
- 16. write_report
+ 15. export_measurements
+ 16. write_evaluation_index
 PLAN
 }
 
 function command_run() {
+    cd "${blueprint_root}"
     ensure_directories
+    write_lessons_template
     print_env > "${HYPOTHETEST_EVALUATION_DIR}/evaluation.env"
     cp "${HYPOTHETEST_PLAN}" "${HYPOTHETEST_EVALUATION_DIR}/hypothetest.yml"
 
@@ -272,8 +307,8 @@ function command_run() {
     run_task run_candidate_workload
     run_task collect_candidate_after
 
-    run_task compare_results
-    run_task write_report
+    run_task export_measurements
+    run_task write_evaluation_index
     log_info "$(green complete) evaluation artifacts at $(cyan "${HYPOTHETEST_EVALUATION_DIR}")"
 }
 
@@ -285,7 +320,9 @@ function task_validate_prerequisites() {
 }
 
 function task_prepare_workspace() {
-    printf 'run_id: %s\n' "${HYPOTHETEST_RUN_ID}" > "${HYPOTHETEST_EVALUATION_DIR}/evaluation.yml"
+    # Architect replaces this with initial schema-valid index generation.
+    log_error "Uncompiled workspace task: generate evaluation.yml and its failure writer"
+    return 1
 }
 
 function task_setup_baseline() {
@@ -344,12 +381,15 @@ function task_collect_candidate_after() {
     run_cmd true
 }
 
-function task_compare_results() {
+function task_export_measurements() {
     run_cmd true
 }
 
-function task_write_report() {
-    run_cmd true
+function task_write_evaluation_index() {
+    # Replace with the schema-valid complete/partial index writer.
+    # Invoke the same writer from on_error before exiting on failure.
+    log_error "Uncompiled evaluation-index writer"
+    return 1
 }
 
 # ----- Process command line arguments -----
