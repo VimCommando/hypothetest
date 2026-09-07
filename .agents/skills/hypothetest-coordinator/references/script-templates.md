@@ -267,8 +267,8 @@ collect_latency() {
   echo "$raw" > "$RAW_DIR/search_stats_t${t}.json"
 
   local query_total query_time
-  query_total=$(echo "$raw" | tq -x -e -r '[.nodes[].indices.search.query_total] | add')
-  query_time=$(echo "$raw" | tq -x -e -r '[.nodes[].indices.search.query_time_in_millis] | add')
+  query_total=$(echo "$raw" | tq -x -e -r '[.nodes[].indices.search.query_total] | add') || return 1
+  query_time=$(echo "$raw" | tq -x -e -r '[.nodes[].indices.search.query_time_in_millis] | add') || return 1
 
   [[ "$query_total" =~ ^[0-9]+$ && "$query_time" =~ ^[0-9]+$ ]] || return 1
 
