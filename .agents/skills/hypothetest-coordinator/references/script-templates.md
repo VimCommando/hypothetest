@@ -212,18 +212,18 @@ collect_use() {
   local tp_write_q tp_write_r tp_search_q tp_search_r
   local disk_total disk_free
 
-  cpu_pct=$(echo "$raw" | tq -x -e -r '[.nodes[].os.cpu.percent] | add / length')
-  heap_pct=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.mem.heap_used_percent] | add / length')
-  gc_old=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.old.collection_count] | add')
-  gc_old_ms=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.old.collection_time_in_millis] | add')
-  gc_young=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.young.collection_count] | add')
-  gc_young_ms=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.young.collection_time_in_millis] | add')
-  tp_write_q=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.write.queue] | add')
-  tp_write_r=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.write.rejected] | add')
-  tp_search_q=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.search.queue] | add')
-  tp_search_r=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.search.rejected] | add')
-  disk_total=$(echo "$raw" | tq -x -e -r '[.nodes[].fs.total.total_in_bytes] | add')
-  disk_free=$(echo "$raw" | tq -x -e -r '[.nodes[].fs.total.free_in_bytes] | add')
+  cpu_pct=$(echo "$raw" | tq -x -e -r '[.nodes[].os.cpu.percent] | add / length') || return 1
+  heap_pct=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.mem.heap_used_percent] | add / length') || return 1
+  gc_old=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.old.collection_count] | add') || return 1
+  gc_old_ms=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.old.collection_time_in_millis] | add') || return 1
+  gc_young=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.young.collection_count] | add') || return 1
+  gc_young_ms=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.young.collection_time_in_millis] | add') || return 1
+  tp_write_q=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.write.queue] | add') || return 1
+  tp_write_r=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.write.rejected] | add') || return 1
+  tp_search_q=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.search.queue] | add') || return 1
+  tp_search_r=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.search.rejected] | add') || return 1
+  disk_total=$(echo "$raw" | tq -x -e -r '[.nodes[].fs.total.total_in_bytes] | add') || return 1
+  disk_free=$(echo "$raw" | tq -x -e -r '[.nodes[].fs.total.free_in_bytes] | add') || return 1
 
   for value in "$cpu_pct" "$heap_pct" "$gc_old" "$gc_old_ms" "$gc_young" "$gc_young_ms" "$tp_write_q" "$tp_write_r" "$tp_search_q" "$tp_search_r" "$disk_total" "$disk_free"; do
     [[ "$value" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || return 1
