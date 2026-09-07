@@ -319,7 +319,7 @@ function run_task() {
     if [[ ${HYPOTHETEST_DRY_RUN} == "true" ]]; then
         log_info "$(yellow dry-run) task $(cyan "${task}") would execute $(white "${fn}")"
     else
-        "${fn}" 2>&1 | tee "${HYPOTHETEST_LOG_DIR}/${task}.log"
+        "${fn}" > >(tee "${HYPOTHETEST_LOG_DIR}/${task}.log") 2>&1
     fi
     log_info "$(green complete) task $(cyan "${task}")"
     current_task=""
