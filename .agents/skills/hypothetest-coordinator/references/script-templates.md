@@ -16,7 +16,7 @@ drive generation decisions:
 **readiness.toon** — what's available on the target platform:
 ```toon
 os: darwin
-jq: verified
+tq: verified
 observation_packages[2]{name,status,note}:
   elasticsearch_api,verified,http://localhost:9200
   darwin_tools,verified,vm_stat iostat
@@ -158,8 +158,7 @@ exit "$PHASE_EXIT"
   instead of queuing. Log it.
 - **Output paths use env vars** — `${HYPOTHETEST_EVIDENCE_DIR}/during/`,
   not relative paths. Prevents artifacts landing under the blueprint root.
-- **Bash by default.** Use Python when `jq` is unavailable (Coordinator
-  reports `jq: missing` in readiness TOON).
+- **Bash with tq.** Verify tq and every generated filter during readiness. If tq is missing, install it through Coordinator setup or block required sampling. User-declared Python phases remain separate prerequisites.
 
 ### Stdout discipline
 
@@ -196,7 +195,7 @@ Each `collect_<method>` function follows the same contract:
 
 1. Hit the relevant API or tool
 2. Archive raw output to `$RAW_DIR`
-3. Extract signals via jq (or Python fallback)
+3. Extract signals with verified tq filters
 4. Append one TOON row to the method's output file
 5. Print a summary `[sample]` line to stdout
 
@@ -213,18 +212,22 @@ collect_use() {
   local tp_write_q tp_write_r tp_search_q tp_search_r
   local disk_total disk_free
 
-  cpu_pct=$(echo "$raw" | jq '[.nodes[].os.cpu.percent] | add / length | round')
-  heap_pct=$(echo "$raw" | jq '[.nodes[].jvm.mem.heap_used_percent] | add / length | round')
-  gc_old=$(echo "$raw" | jq '[.nodes[].jvm.gc.collectors.old.collection_count] | add')
-  gc_old_ms=$(echo "$raw" | jq '[.nodes[].jvm.gc.collectors.old.collection_time_in_millis] | add')
-  gc_young=$(echo "$raw" | jq '[.nodes[].jvm.gc.collectors.young.collection_count] | add')
-  gc_young_ms=$(echo "$raw" | jq '[.nodes[].jvm.gc.collectors.young.collection_time_in_millis] | add')
-  tp_write_q=$(echo "$raw" | jq '[.nodes[].thread_pool.write.queue] | add')
-  tp_write_r=$(echo "$raw" | jq '[.nodes[].thread_pool.write.rejected] | add')
-  tp_search_q=$(echo "$raw" | jq '[.nodes[].thread_pool.search.queue] | add')
-  tp_search_r=$(echo "$raw" | jq '[.nodes[].thread_pool.search.rejected] | add')
-  disk_total=$(echo "$raw" | jq '[.nodes[].fs.total.total_in_bytes] | add')
-  disk_free=$(echo "$raw" | jq '[.nodes[].fs.total.free_in_bytes] | add')
+  cpu_pct=$(echo "$raw" | tq -x -e -r '[.nodes[].os.cpu.percent] | add / length')
+  heap_pct=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.mem.heap_used_percent] | add / length')
+  gc_old=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.old.collection_count] | add')
+  gc_old_ms=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.old.collection_time_in_millis] | add')
+  gc_young=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.young.collection_count] | add')
+  gc_young_ms=$(echo "$raw" | tq -x -e -r '[.nodes[].jvm.gc.collectors.young.collection_time_in_millis] | add')
+  tp_write_q=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.write.queue] | add')
+  tp_write_r=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.write.rejected] | add')
+  tp_search_q=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.search.queue] | add')
+  tp_search_r=$(echo "$raw" | tq -x -e -r '[.nodes[].thread_pool.search.rejected] | add')
+  disk_total=$(echo "$raw" | tq -x -e -r '[.nodes[].fs.total.total_in_bytes] | add')
+  disk_free=$(echo "$raw" | tq -x -e -r '[.nodes[].fs.total.free_in_bytes] | add')
+
+  for value in "$cpu_pct" "$heap_pct" "$gc_old" "$gc_old_ms" "$gc_young" "$gc_young_ms" "$tp_write_q" "$tp_write_r" "$tp_search_q" "$tp_search_r" "$disk_total" "$disk_free"; do
+    [[ "$value" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || return 1
+  done
 
   echo "  ${t},${cpu_pct},${heap_pct},${gc_old},${gc_old_ms},${gc_young},${gc_young_ms},${tp_write_q},${tp_write_r},${tp_search_q},${tp_search_r},${disk_total},${disk_free}" >> "$METHOD_FILE_use"
   echo "[sample] t=$t method=use cpu_pct=$cpu_pct heap_pct=$heap_pct gc_old=$gc_old tp_write_q=$tp_write_q"
@@ -264,8 +267,10 @@ collect_latency() {
   echo "$raw" > "$RAW_DIR/search_stats_t${t}.json"
 
   local query_total query_time
-  query_total=$(echo "$raw" | jq '[.nodes[].indices.search.query_total] | add')
-  query_time=$(echo "$raw" | jq '[.nodes[].indices.search.query_time_in_millis] | add')
+  query_total=$(echo "$raw" | tq -x -e -r '[.nodes[].indices.search.query_total] | add')
+  query_time=$(echo "$raw" | tq -x -e -r '[.nodes[].indices.search.query_time_in_millis] | add')
+
+  [[ "$query_total" =~ ^[0-9]+$ && "$query_time" =~ ^[0-9]+$ ]] || return 1
 
   echo "  ${t},${query_total},${query_time}" >> "$METHOD_FILE_latency"
   echo "[sample] t=$t method=latency query_total=$query_total query_time_ms=$query_time"

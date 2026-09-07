@@ -7,15 +7,19 @@ description: Build or compile Hypothetest blueprints for declarative Elasticsear
 
 You are the architect for Hypothetest, a declarative Elasticsearch benchmark framework.
 
-Your job is to convert benchmark intent into a shareable blueprint: a hypothesis, canonical execution plan, and supporting assets for an evaluation. You do not execute evaluations.
+Compile benchmark intent into a portable blueprint. Read the shared [execution contract](../hypothetest-coordinator/references/execution-contract.md) before generating the runner. It defines artifact ownership, readiness gates, diagnostics selection, and isolation.
 
 ## Core principle
 
 A Hypothetest `hypothesis.md` describes an experiment, not a fixed operation. It follows a seven-step hypothesis evaluation model: observation, question, hypothesis, variables, experiment design, measurement plan, and interpretation. The compiled `hypothetest.yml` keeps that intent flat: deployment, dataset, variations, evaluation steps, measurements, comparison, and report limits.
 
-The Architect's final output is a blueprint. Like a civil engineer's blueprint, it should be precise enough that the Operator can follow it without reinterpreting the design intent, and portable enough that users can share it with each other.
+## Workflow
 
-For execution, prefer deterministic generated shell over implicit orchestration. The Architect should compile the execution order into `generated/scripts/evaluation.sh` using the bundled `references/evaluation-template.sh` as the starting point.
+1. Resolve the hypothesis through consult or compile mode below. Record assumptions and unresolved scientific decisions.
+2. Read the [hypothesis format](references/scenario-format.md), [blueprint layout](references/blueprint.md), and [canonical plan reference](references/canonical-schema.md). Load target and workload references as their branches apply.
+3. Compile the plan, deterministic runner, and metric-source plan. Include the shared execution contract's remote-access and force-merge gates when applicable.
+4. Validate scientific intent and schema structure separately. Resolve every required metric source or mark the blueprint blocked for execution.
+5. Hand off concrete files to Coordinator. Completion requires valid manifests, declared order and isolation, and all referenced assets present or explicitly assigned to Coordinator generation.
 
 ## Inputs
 
@@ -44,8 +48,7 @@ validate `blueprint.yml` against this bundled schema rather than assuming a
 repo-root `schemas/` directory is readable.
 
 The executable plan contract is owned by the Coordinator skill at
-`schemas/hypothetest.schema.yaml`. When cross-skill references are available,
-use the Coordinator-owned schema to validate generated `hypothetest.yml`.
+`schemas/hypothetest.schema.yaml`. Use the Coordinator-owned schema to validate generated `hypothetest.yml`.
 
 ## Required user intent
 
@@ -83,154 +86,9 @@ current stable Elasticsearch release and surface it to the user before
 proceeding. The user may need a specific version for compatibility
 testing, regression work, or to match a production deployment.
 
-## Compose defaults
+For Compose or Kubernetes targets, read [deployment defaults](references/deployment-defaults.md) before compiling their assets.
 
-When target is `compose`, use these defaults unless overridden:
-
-```yaml
-deployment:
-  target: compose
-  scope: local
-  engine: auto
-  elasticsearch:
-    version: latest
-    nodes: 1
-    security: false
-    heap: 2g
-    memory: 4g
-  services:
-    kibana: false
-  repositories:
-    bench-repo:
-      type: fs
-      location: /usr/share/elasticsearch/snapshots/bench-repo
-```
-
-For local compose snapshot, searchable snapshot, frozen-like, or repository behavior, use Elasticsearch filesystem (`fs`) repositories mounted into the Elasticsearch container. MinIO and S3-compatible services are out of scope for local compose.
-
-Compose output should be marked development-grade in generated report guidance and operator guidance.
-
-Compose can execute locally or on a remote host:
-
-```yaml
-deployment:
-  target: compose
-  scope: remote
-  engine: docker
-  remote:
-    host: bench-host
-    user: benchmark
-    auth:
-      method: ssh_certificate
-      ssh_config_host: bench-host
-    workdir: /srv/hypothetest/evaluations
-```
-
-For MVP remote compose, only SSH certificate-based auth through the user's `.ssh/config` is supported. `deployment.remote.user` may specify the remote SSH username, but do not put identity or certificate file paths in `hypothetest.yml`; the Coordinator validates SSH access and remote permission to execute the selected compose engine before Operator execution.
-
-Remote compose SSH controls the deployment host only. Do not imply that raw dataset files are copied to `deployment.remote.workdir`. Dataset ingestion still happens through the declared loader, such as `espipe` or Rally/esrally, against the Elasticsearch endpoint exposed by the deployment. Only generated compose assets, operator scripts, runtime manifests, and deployment support files belong on the remote SSH host unless the blueprint explicitly declares a remote-generated fixture or remote-local phase script.
-
-## Kubernetes defaults
-
-When target is `kubernetes`, use these defaults unless overridden:
-
-```yaml
-deployment:
-  target: kubernetes
-  namespace: hypothetest
-  elasticsearch:
-    version: latest
-    nodes: 1
-    storage: 10Gi
-    security: false
-    heap: 2g
-    memory: 4g
-  services:
-    kibana: false
-  kubernetes:
-    operator_version: 3.3.2
-    install_operator: true
-```
-
-When `kubernetes.provider` is omitted, the Coordinator detects whether a
-cluster exists and asks the user before acting. Explicit `provider: k3s`
-or `provider: existing` skips the question.
-
-Kubernetes output should be marked development-grade when running on k3s
-or similar lightweight distributions. The Coordinator generates CRD
-manifests in `generated/eck/` and lifecycle scripts (`eck-up.sh`,
-`eck-down.sh`) that follow the same calling convention contract as
-compose scripts.
-
-## Dataset loaders
-
-Support both first-class loaders:
-
-```yaml
-dataset:
-  loader: rally
-  track: ./tracks/my-track
-  challenge: append-no-conflicts-index-only
-  params:
-    bulk_size: 5000
-```
-
-```yaml
-dataset:
-  loader: espipe
-  input: ./data/docs.ndjson
-  target: benchmark-index
-  options:
-    batch_size: 5000
-```
-
-Use Rally when the workload is track/challenge oriented. Use espipe when the user wants to load a concrete NDJSON or CSV corpus.
-
-Dataset locality is defined by the loader, not by the deployment SSH target. For remote compose, local input files, Rally tracks, and espipe inputs remain on the machine running the loader unless the dataset explicitly declares that the Operator must generate the data on the remote host. The SSH host does not receive a copy of raw corpus files as part of normal remote deployment setup.
-
-Dataset fixtures in portable blueprints use one object shape:
-
-- Use `path` for data included in the blueprint or expected to already exist.
-- Use `generated_by` for data the Operator should generate during execution.
-- Add checksum metadata when the blueprint includes local data.
-
-## Benchmark phases
-
-Represent benchmark work as user-defined phases, not as a fixed enum of operations.
-
-```yaml
-evaluation:
-  repeats: 3
-  order: randomized
-  reset:
-    - delete_indices
-    - clear_caches
-    - reload_dataset
-    - verify_cluster_green
-  phases:
-    - name: load_data
-      tool: espipe
-      with:
-        input: ./data/docs.ndjson
-        target: benchmark-index
-    - name: measured_search
-      tool: rally
-      with:
-        track: ./tracks/search
-        challenge: default
-```
-
-Allowed initial phase tools:
-
-- `rally`
-- `espipe`
-- `elasticsearch_api`
-- `shell`
-- `python`
-
-Use `shell` and `python` only when the hypothesis genuinely needs arbitrary local logic.
-
-Every phase must have a `name` and `tool`. Put tool-specific options under `with`.
+For loader, fixture, and phase shapes, read [workload plan](references/workload-plan.md).
 
 ## Evaluation script template
 
@@ -238,10 +96,10 @@ Every portable blueprint must include `generated/scripts/evaluation.sh`. Start f
 
 The script is the deterministic execution contract. It should:
 
-- Execute prerequisite checks, deployment setup, resets, data loading, workload phases, diagnostics, measurement export, comparison, and report generation in the declared order.
+- Execute prerequisite checks, deployment setup, resets, data loading, workload phases, diagnostics, raw measurement export, and evaluation-index generation in the declared order.
 - Use named task functions for each operation, with names derived from variation names, repeat numbers, phase names, and diagnostic collection points.
 - Use `run_task <name>` for serial work and `run_parallel <name>...` only for tasks that the hypothesis and measurement plan allow to run concurrently.
-- Preserve raw artifacts before summarizing them. Store phase logs, command output, esdiag bundles, measurements, comparisons, and reports under the evaluation directory created by the script.
+- Preserve raw artifacts before summarizing them. Store phase logs, command output, esdiag bundles, and raw measurements under the evaluation directory. The Analyst adds comparisons and reports later.
 - Source an optional environment file for local credentials and machine-specific paths, but keep secrets out of blueprint manifests and generated scripts.
 - Use environment variables with defaults for paths and run metadata, including `HYPOTHETEST_PLAN`, `HYPOTHETEST_EVALUATION_ROOT`, `HYPOTHETEST_RUN_ID`, `HYPOTHETEST_DRY_RUN`, and `LOG_LEVEL`.
 - Keep shell logic explicit. Do not generate a script that infers phase order dynamically from YAML at runtime when the Architect can compile the order ahead of time.
@@ -311,14 +169,7 @@ report:
 
 ## Metric plan
 
-Raw measurement artifacts must use a wide TOON layout. Generate one row per
-variation/repeat, with `variation`, `repeat`, and run-level `status` as
-dimensions and every metric as its own column. Metric names must encode their
-units (`_seconds`, `_bytes`, `_count`, `_docs_per_second`, and similar), so do
-not emit a redundant `unit` column. Put invariant scenario/evaluation identity,
-deployment target, metric sources, and metric phases in a top-level metadata
-block. Missing measurements use `null` and make the run status `partial` or
-`failed`; do not create a second row for a missing metric.
+Use the [metric normalization contract](../hypothetest-analyst/references/metric-normalization.md) for raw wide run measurements, phase-qualified columns, and missing values.
 
 For each primary metric, identify at least one plausible source:
 
@@ -353,7 +204,7 @@ measure:
           - _cat/segments?format=json
 ```
 
-The Architect should include these API lists in `generated/metrics-plan.yml` and ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.
+The Architect includes these API lists in `generated/metrics-plan.yml`; the Coordinator resolves exact collector selections under the shared execution contract. Ensure each primary metric maps to Rally, espipe, phase output, an `esdiag` bundle, or diagnostics processed by `esdiag` into a results cluster.
 
 ## During-phase observation
 
@@ -384,7 +235,7 @@ TOON formats, interpretation patterns) is in the Coordinator-hosted
 `observation-methods.md` — the Architect prescribes methods, the
 Coordinator resolves them to available packages.
 
-## Validation checklist
+## Scientific validation
 
 Before finalizing a blueprint:
 
@@ -398,8 +249,14 @@ Before finalizing a blueprint:
 - `experiment.constants.best_effort` identifies controls that may be platform-managed or not directly configurable, and interpretation limits explain their impact.
 - Statistical plans declare the null hypothesis, alternative hypothesis, alpha, confidence, test method, test direction, assumptions, and practical effect threshold when those are relevant.
 - Multiple primary metrics or multiple candidates declare a multiple-comparison correction strategy or mark the comparison exploratory.
-- Deployment target is one of `compose`, `kubernetes`, `existing`, or `elastic-cloud`.
-- Dataset loader is `rally` or `espipe`.
+- Variation setup is explicit and does not depend on previous variations unless `evaluation.reset` says shared state is intentional.
+- `generated/scripts/evaluation.sh` exists for portable blueprints and matches the declared evaluation order.
+- Any generated parallel task group contains only independent collection or setup work and does not create measurement ambiguity.
+- The generated runner preserves raw artifacts before summaries, comparisons, or report generation.
+- Interpretation limits identify the workload, dataset, deployment, and Elasticsearch version scope.
+
+## Schema and asset validation
+
 - At least two variations exist.
 - A baseline is named and exists in variations.
 - Each candidate exists in variations.
@@ -414,13 +271,10 @@ Before finalizing a blueprint:
 - Snapshot/searchable snapshot hypotheses include filesystem repository configuration for local compose.
 - Reports include Markdown and TOON unless the user says otherwise.
 - Baseline and candidate names match variation keys exactly.
-- Variation setup is explicit and does not depend on previous variations unless `evaluation.reset` says shared state is intentional.
-- `generated/scripts/evaluation.sh` exists for portable blueprints and matches the declared evaluation order.
-- Any generated parallel task group contains only independent collection or setup work and does not create measurement ambiguity.
-- The generated runner preserves raw artifacts before summaries, comparisons, or report generation.
-- Interpretation limits identify the workload, dataset, deployment, and Elasticsearch version scope.
 
-When schema-validating generated YAML, use the Rust `yaml-schema` package installed with `cargo install yaml-schema`. The installed CLI is `ys`; validate manifests with this skill's `schemas/blueprint.schema.yaml`. Validate `hypothetest.yml` with the Coordinator-owned `schemas/hypothetest.schema.yaml` when that skill is available. If `cargo` is unavailable, route the user to Coordinator setup before treating schema validation as complete.
+Validate the declared deployment target, loader, variation names, and phase fields against the canonical schema. Check every relative asset path from the blueprint root.
+
+When schema-validating generated YAML, use the Rust `yaml-schema` package installed with `cargo install yaml-schema`. The installed CLI is `ys`; validate manifests with this skill's `schemas/blueprint.schema.yaml`. Validate `hypothetest.yml` with the Coordinator-owned `schemas/hypothetest.schema.yaml` from that skill bundle. If it is missing, recover it before claiming schema validation succeeded. If `cargo` is unavailable, route the user to Coordinator setup before treating schema validation as complete.
 
 ## Architect output tone
 

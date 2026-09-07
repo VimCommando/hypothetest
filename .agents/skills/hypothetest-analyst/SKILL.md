@@ -9,7 +9,7 @@ You are the analyst for Hypothetest.
 
 Your job is to interpret completed or partial evaluation artifacts. Do not re-execute benchmarks unless explicitly asked. Preserve uncertainty and separate facts from interpretation.
 
-After the report artifacts are complete, create Kibana dashboards for the collected data when Kibana access is available. If a `kibana-dashboards` skill is available in the agent's skill path, use it for dashboard definitions, validation expectations, connection testing, and API operations. Dashboard creation is optional and depends on skill availability.
+After report artifacts are complete, read [dashboard publishing](references/dashboards.md) when dashboard work is in scope. Use kibana-dashboards if available. Preserve local assets when connection or skill access is unavailable.
 
 ## Input
 
@@ -19,14 +19,12 @@ evaluations/<hypothesis-name>/<timestamp>/
 
 ## Schema dependency
 
-The Analyst consumes evaluation output produced by the Operator. When
-cross-skill references are available, validate `evaluation.yml` with the
-Operator skill's bundled `schemas/evaluation.schema.yaml`.
+The Analyst consumes evaluation output produced by the Operator. Validate evaluation.yml with the [Operator schema](../hypothetest-operator/schemas/evaluation.schema.yaml). If unavailable, report validation as incomplete and recover the schema before claiming a validated report.
 
 Expected files:
 
 - `evaluation.yml`
-- `manifest.toon`
+- `manifest.toon`, optional existing derived output
 - `hypothesis.md`
 - `hypothetest.yml`
 - variation/repeat artifacts
@@ -43,55 +41,32 @@ Supported command aliases:
 Create or update:
 
 ```text
+manifest.toon
 report.md
 summary.toon
 comparison.toon
 charts/
 appendix/
-dashboards/
+dashboards/                 # only for in-scope dashboard work
 ```
 
 Write outputs into the evaluation directory unless the user explicitly requests another destination.
 
 ## Analysis workflow
 
-1. Load `evaluation.yml`, `manifest.toon`, and the canonical plan.
+1. Load `evaluation.yml` and the canonical plan. Read the [execution contract](../hypothetest-coordinator/references/execution-contract.md#artifact-ownership) for ownership. Treat any existing manifest.toon as optional and reconcile it against the index.
 2. Identify the experiment intent, constants, variables, baseline, and candidate variations.
 3. Verify all expected variations, repeats, and phases completed.
 4. Check whether required constants were preserved and whether best-effort constants were approximated or platform-managed.
-5. Extract total evaluation runtime and per-variation runtimes from `evaluation.yml` or `manifest.toon`.
-6. Normalize metrics into a comparison table.
+5. Extract total evaluation runtime and per-variation runtimes from `evaluation.yml`; use an existing manifest.toon only after reconciliation.
+6. Normalize using [metric normalization](references/metric-normalization.md). Preserve each variation/repeat, phase, operation, and missing value.
 7. Compare primary metrics first.
 8. Analyze secondary metrics only to explain or qualify primary findings.
 9. Identify outliers, failed phases, missing data, state leakage risks, runtime anomalies, and unresolved best-effort constants.
-10. Write a clear finding with caveats.
-11. After `report.md`, `summary.toon`, and `comparison.toon` are complete, prepare Kibana dashboard assets and deploy them when credentials are configured.
+10. Create manifest.toon from evaluation.yml runtime facts. Write the report using [report-template.md](references/report-template.md) and TOON outputs using [analysis outputs](references/analysis-outputs.md). Preserve uncertainty.
+11. Validate derived values and artifact links, then update evaluation.yml with normalized measurements and report outputs. Analysis is complete when all expected runs and primary metrics have either evidence-backed results or explicit gaps. Perform in-scope dashboard work through its reference.
 
 If the evaluation is partial, analyze completed data but lead with missing or failed phases. Do not hide failed repeats in averages.
-
-## Required report sections
-
-```markdown
-# Result
-
-# What was compared
-
-# Constants and variables
-
-# Evaluation quality
-
-# Runtime
-
-# Primary metrics
-
-# Interpretation
-
-# Caveats
-
-# Reproduction
-
-# Appendix
-```
 
 ## Result quality labels
 
@@ -160,187 +135,6 @@ Use simple labels initially:
 - `high`: multiple repeats, low variance, clean isolation, no major caveats.
 
 Confidence is not statistical significance. Treat it as a plain-language quality label unless the report includes the actual statistical method.
-
-## Summary TOON shape
-
-```toon
-scenario: name
-deployment_target: compose
-result_quality: development-grade
-runtime_total_seconds: 360.5
-runtime_total_human: 6m 0.5s
-baseline: baseline
-candidates[1]: candidate
-variation_runtime[2]{variation,repeat,seconds,human,status}:
-  baseline,1,120.0,2m 0s,complete
-  candidate,1,240.5,4m 0.5s,complete
-primary_findings[1]{metric,baseline,candidate,delta_absolute,delta_percent,direction,confidence}:
-  search_latency_p99,100,150,50,50,candidate_higher,medium
-caveats[0]:
-artifacts:
-  report: report.md
-  comparison: comparison.toon
-  dashboards: dashboards/
-```
-
-## TOON output
-
-Create `comparison.toon` with this shape:
-
-```toon
-comparisons[1]{scenario,baseline,candidate,phase,metric,baseline_value,candidate_value,delta_absolute,delta_percent,unit,confidence}:
-  example,baseline,candidate,warm_search,search_latency_p99,100,150,50,50,ms,medium
-```
-
-Create or preserve normalized run measurements in the same wide form as the
-Operator artifact. Keep units in metric column names and invariant provenance
-in metadata:
-
-```toon
-metadata:
-  scenario: example
-  evaluation_id: evaluation-001
-  deployment_target: compose
-  metric_sources:
-    search_latency_p99_ms: rally
-  metric_phases:
-    search_latency_p99_ms: warm_search
-runs[1]{variation,repeat,status,search_latency_p99_ms}:
-  baseline,1,ok,100
-```
-
-## Kibana dashboard workflow
-
-Use the `kibana-dashboards` skill after report compilation, in this order:
-
-1. Read the `kibana-dashboards` skill's SKILL.md (if available) before creating dashboard JSON.
-2. Identify which collected evidence is already queryable in Elasticsearch:
-   - Reuse `esdiag` results data streams when diagnostics were processed into a results cluster.
-   - Reuse any Rally, espipe, phase-output, or custom measurement indices already declared in `evaluation.yml` or `manifest.toon`.
-3. For Hypothetest measurements that are only local artifacts and not already indexed, create documents for the shared custom measurement data stream before dashboard creation.
-4. Write generated dashboard definitions and ingestion assets under `dashboards/`.
-5. Test Kibana connectivity with the dashboard skill's required command before creating or updating dashboards.
-6. If the Kibana connection test fails, preserve the dashboard JSON and ingestion assets, explain the required environment variables in the report appendix or final response, and stop before attempting dashboard API writes.
-7. If the connection test succeeds, upsert dashboards with stable IDs derived from the evaluation id or scenario name and timestamp.
-
-Recommended dashboard outputs:
-
-```text
-dashboards/
-  README.md
-  hypothetest-overview.dashboard.json
-  hypothetest-diagnostics.dashboard.json
-  data/
-    measurements.toon
-  elasticsearch/
-    index_template.yml
-```
-
-Prefer inline ES|QL visualization panels in dashboard definitions. Build dense operational dashboards with primary KPIs and key trends above the fold. Use descriptive chart titles, no markdown header panels, and time ranges that cover the evaluation run.
-
-### Dashboard content
-
-Create an overview dashboard when normalized metrics or comparisons exist:
-
-- total runtime and per-variation runtime
-- primary metric baseline/candidate comparison
-- delta percent by metric, phase, and candidate
-- repeat-level metric distribution
-- failed, missing, or partial phase counts
-- confidence and caveat summary as data tables when represented as indexed fields
-
-Create a diagnostics dashboard when `esdiag` results data streams are available:
-
-- cluster, node, index, shard, segment, cache, snapshot, repository, and search/indexing diagnostics relevant to the scenario
-- diagnostic changes across variation, phase, repeat, and collection point
-- links or fields identifying the preserved raw `esdiag` bundles
-
-Do not duplicate `esdiag` documents into a custom Hypothetest index. Query the data streams produced by `esdiag process` directly.
-
-### Custom evidence indexing
-
-Only index custom Hypothetest evidence when the needed dashboard data is not already in `esdiag` results data streams or another declared Elasticsearch destination.
-
-Use `espipe` for custom ingestion. Provide:
-
-- an index template or composable template with correct field types for Kibana visualizations; start from `references/index_template.yml`
-- a TOON measurement file derived from normalized analysis artifacts, preserving links back to source artifacts
-
-Store custom measurement documents in this shared data stream:
-
-```text
-metrics-measurement-hypothetest
-```
-
-Never create a unique measurement data stream per evaluation. Use the document-level `evaluation` keyword for dashboard filters and cross-run comparison.
-
-Conform custom measurement documents to `references/measurement-schema.md`. Keep local measurement artifacts compact and human-readable. Do not expand natural fields into ECS field paths:
-
-- `@timestamp` is the measurement timestamp or best available evaluation timestamp.
-- `evaluation` is the stable top-level keyword used to filter all documents from one evaluation.
-- `scenario`, `deployment`, `variation`, `repeat`, and `phase` are natural benchmark dimensions.
-- `metric`, `value`, `unit`, `source`, and `status` are natural metric fields.
-- `baseline`, `candidate`, deltas, and confidence are natural comparison fields.
-- `data_stream.*` is defined in the index template as constant keywords for the shared stream identity.
-
-Minimum custom measurement fields:
-
-```text
-@timestamp
-evaluation
-scenario
-started_at
-completed_at
-deployment
-variation
-repeat
-phase
-metric
-value
-unit
-source
-status
-artifact
-```
-
-Optional comparison fields:
-
-```text
-baseline
-candidate
-delta_absolute
-delta_percent
-confidence
-```
-
-Map indexed fields consistently: identifiers and labels as `keyword`, metric values and deltas as numeric types, timestamps as `date`, and long report text or caveats as `text` plus `.keyword` only when useful for grouping. Do not flatten semantically different measurements into the same metric name without a phase or dimension field.
-
-### Measurement transform
-
-The Analyst is the transform boundary for custom measurement documents:
-
-1. Read local evidence from `evaluation.yml`, `manifest.toon`, `summary.toon`, `comparison.toon`, phase outputs, Rally outputs, espipe outputs, API output, shell output, and Python output.
-2. Extract source-specific facts without changing their meaning.
-3. Normalize extracted run values into the wide `runs[...]` TOON shape and
-   comparisons into the `comparisons[...]` shape.
-4. Unpivot each wide run only at the dashboard-ingestion boundary, producing
-   one compact measurement row per non-null metric as required by
-   `references/measurement-schema.md`.
-5. Write the rows to `dashboards/data/measurements.toon`.
-6. Ingest that TOON file with espipe's native TOON input support into `metrics-measurement-hypothetest` after the template is ready.
-
-Keep business logic in the Analyst transform. Do not add an ECS-compatibility ingest pipeline. If an evaluation needs an ingest pipeline for source-specific cleanup, keep it limited to that cleanup and do not use it to rename fields into ECS paths.
-
-Do not transform `esdiag` documents into `metrics-measurement-hypothetest`. When `esdiag process` has shipped diagnostics to Elasticsearch, dashboards must query those `esdiag` data streams directly and use `metrics-measurement-hypothetest` only for Hypothetest run-level measurements that are not already indexed elsewhere.
-
-Every generated measurement document must preserve:
-
-- the evaluation filter key through top-level `evaluation`
-- benchmark dimensions as compact `scenario`, `deployment`, `variation`, `repeat`, and `phase` fields
-- numeric metric data as compact `metric` and `value` fields
-- a source artifact path when the value came from a local artifact
-
-Record custom ingestion decisions in `dashboards/README.md`, including the target index or data stream, template path, source TOON path, espipe command used or recommended, and whether ingestion was actually executed.
 
 ## During-phase interpretation
 

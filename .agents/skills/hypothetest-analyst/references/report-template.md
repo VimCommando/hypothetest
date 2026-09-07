@@ -10,6 +10,10 @@ One-paragraph answer to the scenario question.
 | Variation | Key settings | Repeats | Status |
 |---|---|---:|---|
 
+# Constants and variables
+
+Experiment intent, required and best-effort constants, deliberately varied factors, and observed mismatches.
+
 # Evaluation quality
 
 Deployment target, result quality, failures, missing metrics, isolation notes.

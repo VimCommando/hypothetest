@@ -22,9 +22,9 @@ because `elasticsearch_api` is present on every deployment target.
 **Collection shape — elasticsearch_api (always):**
 
 Primary source: `_nodes/stats/os,jvm,thread_pool,fs`. Signals extracted via
-jq from the JSON response. One TOON row per sample interval.
+tq from the JSON response. One TOON row per sample interval.
 
-| Signal | jq path | Notes |
+| Signal | tq path | Notes |
 |---|---|---|
 | cpu_pct | `.nodes[].os.cpu.percent` | avg across nodes |
 | heap_pct | `.nodes[].jvm.mem.heap_used_percent` | avg across nodes |
@@ -75,7 +75,7 @@ Investigates response time distribution shape.
 Primary source: `_nodes/stats/indices/search`. Tracks cumulative query
 totals and time.
 
-| Signal | jq path |
+| Signal | tq path |
 |---|---|
 | query_total | `.nodes[].indices.search.query_total` (sum) |
 | query_time_ms | `.nodes[].indices.search.query_time_in_millis` (sum) |

@@ -18,8 +18,7 @@ or ingestion transforms that require them.
 
 Elasticsearch diagnostics are collected through `esdiag`, using YAML-defined API lists for each collection point. `esdiag` keeps raw API outputs in its bundled `.zip` artifact and can also process those diagnostics directly to a results cluster for metric shipping.
 
-See [LESSONS.md](LESSONS.md) for operator lessons from real runs. The most
-important rules are encoded into the skills: register `esdiag` hosts before
+The skills encode lessons from real runs: register `esdiag` hosts before
 collection, use positional `esdiag collect <HOST> <OUTPUT_DIR> --type standard`,
 stream task logs with `tee`, use `ESRALLY_BIN` for background Rally runs, and
 use Rally report files plus the metrics store instead of nonexistent
@@ -115,7 +114,7 @@ do not copy corpus files into the cache while Rally is running.
 
 Datasets are declared once in `blueprint.yml`. Use `path` when the data is included or expected to already exist; use `generated_by` when the Operator should generate it during execution.
 
-Evaluation outputs may include `evaluations/`, `evaluation.yml`, `lessons.md`, `manifest.toon`, `summary.toon`, `comparison.toon`, `report.md`, charts, and raw esdiag `.zip` bundles. An evaluation is the complete output of executing a Hypothetest plan: preserved evidence, diagnostics, measurements, comparisons, generated artifacts, run-local lessons, and the final report. `evaluation.yml` is the schema-valid index for those artifacts; `manifest.toon` is the compact runtime manifest.
+Evaluation outputs may include `evaluations/`, `evaluation.yml`, `lessons.md`, `manifest.toon`, `summary.toon`, `comparison.toon`, `report.md`, charts, and raw esdiag `.zip` bundles. An evaluation is the complete output of executing a Hypothetest plan: preserved evidence, diagnostics, measurements, comparisons, generated artifacts, run-local lessons, and the final report. The Operator writes `evaluation.yml` as the schema-valid index of execution evidence. The Analyst derives `manifest.toon` from that index and adds normalized measurements, comparisons, and reports.
 
 `blueprint.yml` is the machine-readable manifest for the zip contents and validates against the Architect-owned blueprint schema. It uses the same flat style as `hypothetest.yml`: `name`, `hypothesis`, `plan`, `readme`, `prerequisites`, `include`, `datasets`, and `archive`.
 

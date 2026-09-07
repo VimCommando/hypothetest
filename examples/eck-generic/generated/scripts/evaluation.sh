@@ -277,23 +277,23 @@ Started At: ${EVAL_START_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
 
 ## Assumptions That Held
 
-- 
+-
 
 ## Assumptions That Failed
 
-- 
+-
 
 ## Errors And Fixes
 
-- 
+-
 
 ## Tool Or Environment Feedback
 
-- 
+-
 
 ## Follow-Up Candidates
 
-- 
+-
 EOF
 }
 

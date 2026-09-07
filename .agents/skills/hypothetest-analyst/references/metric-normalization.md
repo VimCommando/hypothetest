@@ -23,6 +23,12 @@ Use `null` for missing metrics and set the run-level status to `partial` or
 `failed`. Do not add a separate unit column or repeat invariant metadata in
 the run table.
 
+## Metric identity and comparison calculations
+
+Each metric column identifies a single source, phase, operation/query dimension when present, and unit across the evaluation. When a metric occurs in multiple phases, qualify its name, such as `cold_search_latency_p99_ms` and `warm_search_latency_p99_ms`. Qualify differing operations or sources as well. Store these mappings in metadata; never overwrite one phase's value with another.
+
+Use `delta_absolute = candidate - baseline`. For a nonzero baseline use `delta_percent = 100 * delta_absolute / baseline`. For a zero or missing baseline, write `null` for percent delta and explain that the relative change is undefined. Preserve absolute delta when both values exist. Never average semantically different phases or operations.
+
 Comparison rows should include:
 
 ```toon
